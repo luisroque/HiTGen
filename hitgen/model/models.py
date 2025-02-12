@@ -4,8 +4,9 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 from keras import layers
 import tensorflow as tf
-from tensorflow.keras.utils import Sequence
-from keras.regularizers import l2
+from tensorflow.keras import utils
+from keras import regularizers
+
 
 from tensorflow import keras
 
@@ -26,7 +27,7 @@ class ReLULinearSaturationLayer(layers.Layer):
         return tf.minimum(relu_part, 1.0)
 
 
-class TemporalizeGenerator(Sequence):
+class TemporalizeGenerator(utils.Sequence):
     def __init__(
         self,
         data,
@@ -581,7 +582,7 @@ def encoder(
                 input_shape[1],
                 return_sequences=True,
                 dropout=0.3,
-                kernel_regularizer=l2(0.001),
+                kernel_regularizer=regularizers.l2(0.001),
             )
         )(backcast_total)
 
@@ -694,7 +695,7 @@ def decoder(
                 num_features,
                 return_sequences=True,
                 dropout=0.3,
-                kernel_regularizer=l2(0.001),
+                kernel_regularizer=regularizers.l2(0.001),
             )
         )(backcast_total)
 
@@ -710,7 +711,7 @@ def decoder(
     backcast_out = layers.Flatten(name="flatten_decoder_output_CVAE")(final_backcast)
     backcast_out = layers.Dense(
         time_steps * num_features,
-        kernel_regularizer=l2(0.001),
+        kernel_regularizer=regularizers.l2(0.001),
         activation=tf.keras.layers.LeakyReLU(alpha=0.01),
         name="dense_output_CVAE",
     )(backcast_out)
@@ -729,7 +730,7 @@ def decoder(
                     num_features,
                     return_sequences=True,
                     dropout=0.3,
-                    kernel_regularizer=l2(0.001),
+                    kernel_regularizer=regularizers.l2(0.001),
                 )
             )(forecast_total)
 
@@ -746,7 +747,7 @@ def decoder(
         )
         forecast_out = layers.Dense(
             time_steps * num_features,
-            kernel_regularizer=l2(0.001),
+            kernel_regularizer=regularizers.l2(0.001),
             activation=tf.keras.layers.LeakyReLU(alpha=0.01),
             name="dense_forecast_CVAE",
         )(forecast_out)

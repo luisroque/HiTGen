@@ -812,7 +812,7 @@ class CreateTransformedVersionsCVAE:
         kernel_size = trial.suggest_int("kernel_size", 2, 5)
         pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
         batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-        epochs = trial.suggest_int("epochs", 1, 3, step=1)
+        epochs = trial.suggest_int("epochs", 200, 2000, step=100)
         learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
         bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
         forecasting = trial.suggest_categorical("forecasting", [True, False])
@@ -940,7 +940,7 @@ class CreateTransformedVersionsCVAE:
         #     print(f"Error in trial: {e}")
         #     raise optuna.exceptions.TrialPruned()
 
-    def hyper_tune_and_train(self, n_trials=3):
+    def hyper_tune_and_train(self, n_trials=30):
         """
         Run Optuna hyperparameter tuning for the CVAE and train the best model.
         """
