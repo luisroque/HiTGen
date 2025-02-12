@@ -1,10 +1,10 @@
-tensorflow==2.15.1
+tensorflow==2.17.0
 matplotlib==3.9.2
 seaborn==0.13.2
 scikit-learn==1.5.2
 scikit-optimize==0.10.2
 tsfeatures==0.4.5
-ydata-synthetic==1.4.0
+# ydata-synthetic==1.4.0
 huggingface-hub==0.26.1
 optuna==4.0.0
 datasetsforecast==0.0.8

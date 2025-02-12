@@ -3,26 +3,27 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 from keras import layers
-from keras import backend as K
-from tensorflow import keras
 import tensorflow as tf
 from tensorflow.keras.utils import Sequence
 from keras.regularizers import l2
 
+from tensorflow import keras
 
-def custom_relu_linear_saturation(x):
+K = keras.backend
+
+
+class ReLULinearSaturationLayer(layers.Layer):
     """
     Custom activation:
     - 0 for x < 0 (ReLU behavior)
     - Linear (x) for 0 <= x <= 1
     - Saturates at 1 for x > 1
     """
-    relu_part = tf.nn.relu(x)
 
-    # linear between 0 and 1 and saturation at 1
-    linear_part = tf.minimum(relu_part, 1.0)
-
-    return linear_part
+    def call(self, x):
+        # same logic
+        relu_part = tf.nn.relu(x)
+        return tf.minimum(relu_part, 1.0)
 
 
 class TemporalizeGenerator(Sequence):
@@ -68,7 +69,23 @@ class TemporalizeGenerator(Sequence):
         batch_mask = tf.gather(self.temporalized_mask, batch_indices)
         batch_dyn_features = tf.gather(self.temporalized_dyn_features, batch_indices)
 
-        return (batch_data, batch_mask, batch_dyn_features), batch_data
+        # one-step ahead
+        batch_target_indices = tf.minimum(
+            batch_indices + 1, len(self.temporalized_data) - 1
+        )
+        batch_target = tf.gather(self.temporalized_data, batch_target_indices)
+
+        # multi-step ahead
+        # future_steps = 24  # number of steps to predict
+        # batch_target = tf.map_fn(
+        #     lambda i: self.temporalized_data[i + 1 : i + 1 + future_steps],
+        #     batch_indices,
+        #     fn_output_signature=tf.TensorSpec(
+        #         (future_steps, batch_data.shape[2]), tf.float32
+        #     ),
+        # )
+
+        return (batch_data, batch_mask, batch_dyn_features), batch_target
 
     def on_epoch_end(self):
         """Shuffle data and re-temporalize."""
@@ -218,6 +235,7 @@ class CVAE(keras.Model):
         encoder: keras.Model,
         decoder: keras.Model,
         kl_weight_initial: int = None,
+        forecasting: bool = True,
         **kwargs,
     ) -> None:
         super(CVAE, self).__init__(**kwargs)
@@ -228,10 +246,13 @@ class CVAE(keras.Model):
             kl_weight_initial, trainable=False, name="kl_weight"
         )
 
+        self.forecasting = forecasting
+
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="reconstruction_loss"
         )
+        self.prediction_loss_tracker = keras.metrics.Mean(name="prediction_loss")
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
 
     def call(self, inputs, training=None, mask=None):
@@ -241,15 +262,29 @@ class CVAE(keras.Model):
             [batch_data, batch_mask, batch_dyn_features]
         )
 
-        pred = self.decoder([z, batch_mask, batch_dyn_features])
+        pred_reconst, pred = self.decoder([z, batch_mask, batch_dyn_features])
 
-        return pred, z_mean, z_log_var
+        return pred_reconst, z_mean, z_log_var
 
-    def compute_loss(self, inp_data, pred, z_mean, z_log_var, mask):
+    @property
+    def metrics(self):
+        """Ensures that Keras tracks the metrics properly during training."""
+        return [
+            self.total_loss_tracker,
+            self.reconstruction_loss_tracker,
+            self.prediction_loss_tracker,
+            self.kl_loss_tracker,
+        ]
+
+    def compute_loss(
+        self, inp_data, pred_reconst, pred, z_mean, z_log_var, mask, batch_target
+    ):
         """
         Computes total loss with reconstruction loss, cosine similarity and KL divergence.
         """
-        reconstruction_loss = masked_mse(inp_data, pred, mask)
+        reconstruction_loss = masked_mse(
+            y_true=inp_data, y_pred=pred_reconst, mask=mask
+        )
 
         # cosine_loss = cosine_similarity_loss(inp_data, pred, mask)
 
@@ -267,24 +302,39 @@ class CVAE(keras.Model):
 
         kl_loss = -0.5 * K.mean(1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
 
+        if self.forecasting:
+            prediction_loss = masked_mse(y_true=batch_target, y_pred=pred, mask=mask)
+            total_loss = (
+                reconstruction_loss + prediction_loss + self.kl_weight * kl_loss
+            )
+        else:
+            total_loss = reconstruction_loss + self.kl_weight * kl_loss
+            prediction_loss = reconstruction_loss
+
         # total_loss = reconstruction_loss + 0.1 * cosine_loss + self.kl_weight * kl_loss
 
-        total_loss = reconstruction_loss + self.kl_weight * kl_loss
-
-        return total_loss, reconstruction_loss, kl_loss
+        return total_loss, reconstruction_loss, prediction_loss, kl_loss
 
     def train_step(self, data):
-        inputs, targets = data
+        inputs, batch_target = data
         batch_data, batch_mask, batch_dyn_features = inputs
 
         with tf.GradientTape() as tape:
             z_mean, z_log_var, z = self.encoder(
                 [batch_data, batch_mask, batch_dyn_features]
             )
-            pred = self.decoder([z, batch_mask, batch_dyn_features])
+            pred_reconst, pred = self.decoder([z, batch_mask, batch_dyn_features])
 
-            total_loss, reconstruction_loss, kl_loss = self.compute_loss(
-                batch_data, pred, z_mean, z_log_var, batch_mask
+            total_loss, reconstruction_loss, prediction_loss, kl_loss = (
+                self.compute_loss(
+                    batch_data,
+                    pred_reconst,
+                    pred,
+                    z_mean,
+                    z_log_var,
+                    batch_mask,
+                    batch_target,
+                )
             )
 
         grads = tape.gradient(total_loss, self.trainable_weights)
@@ -292,11 +342,13 @@ class CVAE(keras.Model):
 
         self.total_loss_tracker.update_state(total_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.prediction_loss_tracker.update_state(prediction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
 
         return {
             "loss": self.total_loss_tracker.result(),
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+            "prediction_loss": self.prediction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
         }
 
@@ -309,13 +361,14 @@ class CVAE(keras.Model):
         )
         pred = self.decoder([z, batch_mask, batch_dyn_features])
 
-        total_loss, reconstruction_loss, kl_loss = self.compute_loss(
+        total_loss, reconstruction_loss, prediction_loss, kl_loss = self.compute_loss(
             batch_data, pred, z_mean, z_log_var, batch_mask
         )
 
         return {
             "loss": total_loss,
             "reconstruction_loss": reconstruction_loss,
+            "prediction_loss": prediction_loss,
             "kl_loss": kl_loss,
         }
 
@@ -353,6 +406,7 @@ def get_CVAE(
     n_layers: int = 2,
     kernel_size: int = 2,
     pooling_mode: str = "max",
+    forecasting: bool = True,
 ) -> tuple[tf.keras.Model, tf.keras.Model]:
     """
     Constructs and returns the encoder and decoder models for the CVAE.
@@ -383,6 +437,7 @@ def get_CVAE(
         n_layers=n_layers,
         kernel_size=kernel_size,
         pooling_mode=pooling_mode,
+        forecasting=forecasting,
     )
 
     return enc, dec
@@ -427,6 +482,55 @@ class MRHIBlock(tf.keras.layers.Layer):
         backcast = self.backcast_layer(x)
 
         return backcast
+
+
+class MRHIBlock_backcast_forecast(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        backcast_size,
+        n_hidden,
+        n_layers,
+        pooling_mode="max",
+        kernel_size=3,
+        **kwargs,
+    ):
+        """
+        Multi-Rate Hierarchical Interpolation Block for time-series decomposition.
+        """
+        super(MRHIBlock_backcast_forecast, self).__init__(**kwargs)
+        self.backcast_size = backcast_size
+
+        if pooling_mode == "max":
+            self.pooling_layer = layers.MaxPooling1D(
+                pool_size=kernel_size, strides=1, padding="same"
+            )
+        else:
+            self.pooling_layer = layers.AveragePooling1D(
+                pool_size=kernel_size, strides=1, padding="same"
+            )
+
+        self.mlp_stack = tf.keras.Sequential(
+            [layers.Dense(n_hidden, activation="relu") for _ in range(n_layers)]
+        )
+        self.backcast_layer = layers.TimeDistributed(
+            layers.Dense(backcast_size[1], activation="linear")
+        )
+        self.forecast_layer = layers.TimeDistributed(
+            layers.Dense(backcast_size[1], activation="linear")
+        )
+
+    def call(self, backcast_input, forecast_input):
+        # process backcast
+        x = self.pooling_layer(backcast_input)
+        x = self.mlp_stack(x)
+        backcast = self.backcast_layer(x)
+
+        # process forecast
+        y = self.pooling_layer(forecast_input)
+        y = self.mlp_stack(y)
+        forecast = self.forecast_layer(y)
+
+        return backcast, forecast
 
 
 def encoder(
@@ -494,8 +598,13 @@ def encoder(
     )(final_output)
 
     # clip z_log_var and z_mean to prevent KL loss explosion
-    z_mean = tf.clip_by_value(final_output[:, :, latent_dim:], -5, 5)
-    z_log_var = tf.clip_by_value(final_output[:, :, :latent_dim], -5, 5)
+    z_mean = layers.Lambda(lambda x: tf.clip_by_value(x[:, :, latent_dim:], -5, 5))(
+        final_output
+    )
+
+    z_log_var = layers.Lambda(lambda x: tf.clip_by_value(x[:, :, :latent_dim], -5, 5))(
+        final_output
+    )
 
     z = Sampling(name="sampling", noise_scale_init=noise_scale_init)(
         [z_mean, z_log_var]
@@ -518,47 +627,71 @@ def decoder(
     kernel_size=2,
     pooling_mode="max",
     bi_rnn=True,
+    forecasting=True,
 ):
+    relu_saturation = ReLULinearSaturationLayer()
 
-    latent_input = layers.Input(
-        shape=(output_shape[0], latent_dim),
-        name="latent_input",
-    )
+    time_steps = output_shape[0]
+    num_features = output_shape[1]
+
+    latent_input = layers.Input(shape=(time_steps, latent_dim), name="latent_input")
     dyn_features_input = layers.Input(
         shape=output_shape_dyn_features, name="dyn_features_input"
     )
     mask_input = layers.Input(shape=output_shape, name="mask_input")
 
     x = layers.TimeDistributed(
-        layers.Dense(output_shape[1], activation=tf.keras.layers.LeakyReLU(alpha=0.01))
+        layers.Dense(num_features, activation=tf.keras.layers.LeakyReLU(alpha=0.01))
     )(latent_input)
 
     x = layers.Concatenate()([dyn_features_input, x])
 
     x = layers.TimeDistributed(
-        layers.Dense(output_shape[1], activation=tf.keras.layers.LeakyReLU(alpha=0.01))
+        layers.Dense(num_features, activation=tf.keras.layers.LeakyReLU(alpha=0.01))
     )(x)
 
     backcast_total = x
-    final_output = 0
+    forecast_total = x
+    final_backcast = 0
+    final_forecast = 0
 
-    for i in range(n_blocks):
-        mrhi_block = MRHIBlock(
-            backcast_size=output_shape,
-            n_hidden=n_hidden,
-            n_layers=n_layers,
-            pooling_mode=pooling_mode,
-            kernel_size=kernel_size,
-        )
+    if forecasting:
+        for i in range(n_blocks):
+            mrhi_block = MRHIBlock_backcast_forecast(
+                backcast_size=output_shape,
+                n_hidden=n_hidden,
+                n_layers=n_layers,
+                pooling_mode=pooling_mode,
+                kernel_size=kernel_size,
+            )
 
-        backcast = mrhi_block(backcast_total)
-        backcast_total = backcast_total - backcast
-        final_output += backcast
+            backcast, forecast = mrhi_block(backcast_total, forecast_total)
+
+            backcast_total = backcast_total - backcast
+            forecast_total = forecast_total - forecast
+
+            final_backcast += backcast
+            final_forecast += forecast
+    else:
+        for i in range(n_blocks):
+            mrhi_block = MRHIBlock(
+                backcast_size=output_shape,
+                n_hidden=n_hidden,
+                n_layers=n_layers,
+                pooling_mode=pooling_mode,
+                kernel_size=kernel_size,
+            )
+
+            backcast = mrhi_block(backcast_total)
+
+            backcast_total = backcast_total - backcast
+
+            final_backcast += backcast
 
     if bi_rnn:
         backcast = layers.Bidirectional(
             layers.GRU(
-                output_shape[1],
+                num_features,
                 return_sequences=True,
                 dropout=0.3,
                 kernel_regularizer=l2(0.001),
@@ -571,26 +704,66 @@ def decoder(
             )
         )(backcast)
 
-        final_output += backcast
+        final_backcast += backcast
 
-    out = layers.Flatten(name="flatten_decoder_output_CVAE")(final_output)
-    out = layers.Dense(
-        output_shape[0] * output_shape[1],
+    # --- Backcast output (Reconstruction of Past) ---
+    backcast_out = layers.Flatten(name="flatten_decoder_output_CVAE")(final_backcast)
+    backcast_out = layers.Dense(
+        time_steps * num_features,
         kernel_regularizer=l2(0.001),
         activation=tf.keras.layers.LeakyReLU(alpha=0.01),
         name="dense_output_CVAE",
-    )(out)
+    )(backcast_out)
+    backcast_out = layers.Reshape(
+        (time_steps, num_features), name="reshape_final_output_CVAE"
+    )(backcast_out)
 
-    out = layers.Reshape(
-        (output_shape[0], output_shape[1]), name="reshape_final_output_CVAE"
-    )(out)
+    backcast_out = layers.Multiply(name="masked_output")([backcast_out, mask_input])
+    backcast_out = relu_saturation(backcast_out)
 
-    final_output = layers.Multiply(name="masked_output")([out, mask_input])
+    # --- Forecasting Part ---
+    if forecasting:
+        if bi_rnn:
+            forecast = layers.Bidirectional(
+                layers.GRU(
+                    num_features,
+                    return_sequences=True,
+                    dropout=0.3,
+                    kernel_regularizer=l2(0.001),
+                )
+            )(forecast_total)
 
-    final_output = custom_relu_linear_saturation(final_output)
+            forecast = layers.TimeDistributed(
+                layers.Dense(
+                    output_shape[1], activation=tf.keras.layers.LeakyReLU(alpha=0.01)
+                )
+            )(forecast)
+
+            final_forecast += forecast
+
+        forecast_out = layers.Flatten(name="flatten_forecast_output_CVAE")(
+            final_forecast
+        )
+        forecast_out = layers.Dense(
+            time_steps * num_features,
+            kernel_regularizer=l2(0.001),
+            activation=tf.keras.layers.LeakyReLU(alpha=0.01),
+            name="dense_forecast_CVAE",
+        )(forecast_out)
+        forecast_out = layers.Reshape(
+            (time_steps, num_features), name="reshape_forecast_output_CVAE"
+        )(forecast_out)
+
+        forecast_out = layers.Multiply(name="masked_forecast_output")(
+            [forecast_out, mask_input]
+        )
+        forecast_out = relu_saturation(forecast_out)
+
+    else:
+        forecast_out = backcast_out
 
     return tf.keras.Model(
         inputs=[latent_input, mask_input, dyn_features_input],
-        outputs=[final_output],
+        outputs=[backcast_out, forecast_out],
         name="decoder",
     )

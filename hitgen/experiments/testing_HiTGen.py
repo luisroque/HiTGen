@@ -11,7 +11,8 @@ from hitgen.metrics.discriminative_score import (
 )
 from hitgen.visualization import plot_generated_vs_original
 from hitgen.benchmarks.metaforecast import workflow_metaforecast_methods
-from ydata_synthetic.synthesizers import ModelParameters, TrainParameters
+
+# from ydata_synthetic.synthesizers import ModelParameters, TrainParameters
 
 DATASETS_HYPERPARAMS_CONFIGS = {
     "Tourism": {
@@ -36,21 +37,21 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "loss": 0.0016558588249608874,
                 "score": 0.834054834054834,
             },
-            "timegan": {
-                "gan_args": ModelParameters(
-                    batch_size=16,
-                    lr=2e-4,
-                    noise_dim=16,
-                    layers_dim=32,
-                    latent_dim=32,
-                    gamma=1.0,
-                ),
-                "train_args": TrainParameters(
-                    epochs=1000,
-                    sequence_length=24,
-                    number_sequences=4,
-                ),
-            },
+            # "timegan": {
+            #     "gan_args": ModelParameters(
+            #         batch_size=16,
+            #         lr=2e-4,
+            #         noise_dim=16,
+            #         layers_dim=32,
+            #         latent_dim=32,
+            #         gamma=1.0,
+            #     ),
+            #     "train_args": TrainParameters(
+            #         epochs=1000,
+            #         sequence_length=24,
+            #         number_sequences=4,
+            #     ),
+            # },
         }
     },
     "M1": {
@@ -75,21 +76,21 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "loss": 0.021175503730773926,
                 "score": 0.721407624633431,
             },
-            "timegan": {
-                "gan_args": ModelParameters(
-                    batch_size=16,
-                    lr=2e-4,
-                    noise_dim=16,
-                    layers_dim=32,
-                    latent_dim=32,
-                    gamma=1.0,
-                ),
-                "train_args": TrainParameters(
-                    epochs=1000,
-                    sequence_length=24,
-                    number_sequences=4,
-                ),
-            },
+            # "timegan": {
+            #     "gan_args": ModelParameters(
+            #         batch_size=16,
+            #         lr=2e-4,
+            #         noise_dim=16,
+            #         layers_dim=32,
+            #         latent_dim=32,
+            #         gamma=1.0,
+            #     ),
+            #     "train_args": TrainParameters(
+            #         epochs=1000,
+            #         sequence_length=24,
+            #         number_sequences=4,
+            #     ),
+            # },
         },
         "Quarterly": {
             "hitgen": {
@@ -112,21 +113,21 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "loss": 0.01676071435213089,
                 "score": 0.8552188552188552,
             },
-            "timegan": {
-                "gan_args": ModelParameters(
-                    batch_size=16,
-                    lr=2e-4,
-                    noise_dim=16,
-                    layers_dim=32,
-                    latent_dim=32,
-                    gamma=1.0,
-                ),
-                "train_args": TrainParameters(
-                    epochs=1000,
-                    sequence_length=24,
-                    number_sequences=4,
-                ),
-            },
+            # "timegan": {
+            #     "gan_args": ModelParameters(
+            #         batch_size=16,
+            #         lr=2e-4,
+            #         noise_dim=16,
+            #         layers_dim=32,
+            #         latent_dim=32,
+            #         gamma=1.0,
+            #     ),
+            #     "train_args": TrainParameters(
+            #         epochs=1000,
+            #         sequence_length=24,
+            #         number_sequences=4,
+            #     ),
+            # },
         },
     },
     "M3": {
@@ -149,21 +150,21 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "shuffle": True,
                 "noise_scale_init": 0.1,
             },
-            "timegan": {
-                "gan_args": ModelParameters(
-                    batch_size=16,
-                    lr=2e-4,
-                    noise_dim=16,
-                    layers_dim=32,
-                    latent_dim=32,
-                    gamma=1.0,
-                ),
-                "train_args": TrainParameters(
-                    epochs=1000,
-                    sequence_length=24,
-                    number_sequences=4,
-                ),
-            },
+            # "timegan": {
+            #     "gan_args": ModelParameters(
+            #         batch_size=16,
+            #         lr=2e-4,
+            #         noise_dim=16,
+            #         layers_dim=32,
+            #         latent_dim=32,
+            #         gamma=1.0,
+            #     ),
+            #     "train_args": TrainParameters(
+            #         epochs=1000,
+            #         sequence_length=24,
+            #         number_sequences=4,
+            #     ),
+            # },
         },
         "Quarterly": {
             "hitgen": {
@@ -186,21 +187,21 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "loss": 0.06204835698008537,
                 "score": 0.7087813620071683,
             },
-            "timegan": {
-                "gan_args": ModelParameters(
-                    batch_size=16,
-                    lr=2e-4,
-                    noise_dim=16,
-                    layers_dim=32,
-                    latent_dim=32,
-                    gamma=1.0,
-                ),
-                "train_args": TrainParameters(
-                    epochs=1000,
-                    sequence_length=24,
-                    number_sequences=4,
-                ),
-            },
+            # "timegan": {
+            #     "gan_args": ModelParameters(
+            #         batch_size=16,
+            #         lr=2e-4,
+            #         noise_dim=16,
+            #         layers_dim=32,
+            #         latent_dim=32,
+            #         gamma=1.0,
+            #     ),
+            #     "train_args": TrainParameters(
+            #         epochs=1000,
+            #         sequence_length=24,
+            #         number_sequences=4,
+            #     ),
+            # },
         },
         "Yearly": {
             "hitgen": {
@@ -223,21 +224,21 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "loss": 0.014789092354476452,
                 "score": 0.7954816987075052,
             },
-            "timegan": {
-                "gan_args": ModelParameters(
-                    batch_size=16,
-                    lr=2e-4,
-                    noise_dim=16,
-                    layers_dim=32,
-                    latent_dim=32,
-                    gamma=1.0,
-                ),
-                "train_args": TrainParameters(
-                    epochs=1000,
-                    sequence_length=24,
-                    number_sequences=4,
-                ),
-            },
+            # "timegan": {
+            #     "gan_args": ModelParameters(
+            #         batch_size=16,
+            #         lr=2e-4,
+            #         noise_dim=16,
+            #         layers_dim=32,
+            #         latent_dim=32,
+            #         gamma=1.0,
+            #     ),
+            #     "train_args": TrainParameters(
+            #         epochs=1000,
+            #         sequence_length=24,
+            #         number_sequences=4,
+            #     ),
+            # },
         },
     },
     "M4": {
@@ -260,21 +261,21 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "shuffle": True,
                 "noise_scale_init": 0.1,
             },
-            "timegan": {
-                "gan_args": ModelParameters(
-                    batch_size=16,
-                    lr=2e-4,
-                    noise_dim=16,
-                    layers_dim=32,
-                    latent_dim=32,
-                    gamma=1.0,
-                ),
-                "train_args": TrainParameters(
-                    epochs=1000,
-                    sequence_length=24,
-                    number_sequences=4,
-                ),
-            },
+            # "timegan": {
+            #     "gan_args": ModelParameters(
+            #         batch_size=16,
+            #         lr=2e-4,
+            #         noise_dim=16,
+            #         layers_dim=32,
+            #         latent_dim=32,
+            #         gamma=1.0,
+            #     ),
+            #     "train_args": TrainParameters(
+            #         epochs=1000,
+            #         sequence_length=24,
+            #         number_sequences=4,
+            #     ),
+            # },
         },
         "Quarterly": {
             "hitgen": {
@@ -295,37 +296,37 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "shuffle": True,
                 "noise_scale_init": 0.1,
             },
-            "timegan": {
-                "gan_args": ModelParameters(
-                    batch_size=16,
-                    lr=2e-4,
-                    noise_dim=16,
-                    layers_dim=32,
-                    latent_dim=32,
-                    gamma=1.0,
-                ),
-                "train_args": TrainParameters(
-                    epochs=1000,
-                    sequence_length=24,
-                    number_sequences=4,
-                ),
-            },
+            # "timegan": {
+            #     "gan_args": ModelParameters(
+            #         batch_size=16,
+            #         lr=2e-4,
+            #         noise_dim=16,
+            #         layers_dim=32,
+            #         latent_dim=32,
+            #         gamma=1.0,
+            #     ),
+            #     "train_args": TrainParameters(
+            #         epochs=1000,
+            #         sequence_length=24,
+            #         number_sequences=4,
+            #     ),
+            # },
         },
     },
 }
 
 DATASET_GROUP_FREQ = {
-    "Tourism": {
-        "Monthly": {"FREQ": "M", "H": 24},
-    },
-    "M1": {
-        "Monthly": {"FREQ": "M", "H": 24},
-        "Quarterly": {"FREQ": "Q", "H": 8},
-    },
+    # "Tourism": {
+    #     "Monthly": {"FREQ": "M", "H": 24},
+    # },
+    # "M1": {
+    #     "Monthly": {"FREQ": "M", "H": 24},
+    # "Quarterly": {"FREQ": "Q", "H": 8},
+    # },
     "M3": {
         "Monthly": {"FREQ": "M", "H": 24},
-        "Quarterly": {"FREQ": "Q", "H": 8},
-        "Yearly": {"FREQ": "Y", "H": 4},
+        #     "Quarterly": {"FREQ": "Q", "H": 8},
+        #     "Yearly": {"FREQ": "Y", "H": 4},
     },
 }
 
@@ -419,9 +420,9 @@ if __name__ == "__main__":
             ANNEALING_HITGEN = False
 
             # TIMEGAN Configurations
-            timegan_config = dataset_config["timegan"]
-            gan_args = timegan_config["gan_args"]
-            train_args = timegan_config["train_args"]
+            # timegan_config = dataset_config["timegan"]
+            # gan_args = timegan_config["gan_args"]
+            # train_args = timegan_config["train_args"]
 
             SYNTHETIC_FILE_PATH_HITGEN = (
                 f"assets/model_weights/{DATASET}_{DATASET_GROUP}_synthetic_hitgen.pkl"
@@ -451,7 +452,7 @@ if __name__ == "__main__":
             )
 
             # hypertuning
-            # create_dataset_vae.hyper_tune_and_train()
+            create_dataset_vae.hyper_tune_and_train()
 
             # fit
             model, history, _ = create_dataset_vae.fit(

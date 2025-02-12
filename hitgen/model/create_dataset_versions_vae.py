@@ -95,6 +95,7 @@ class CreateTransformedVersionsCVAE:
         amplitude: float = 1.0,
         stride_temporalize: int = 2,
         bi_rnn: bool = True,
+        forecasting: bool = True,
         annealing: bool = True,
         kl_weight_init: float = None,
         noise_scale_init: float = None,
@@ -123,6 +124,7 @@ class CreateTransformedVersionsCVAE:
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.bi_rnn = bi_rnn
+        self.forecasting = forecasting
         self.annealing = annealing
         self.kl_weight_init = kl_weight_init
         self.noise_scale_init = noise_scale_init
@@ -590,9 +592,15 @@ class CreateTransformedVersionsCVAE:
             n_layers=self.n_layers,
             kernel_size=self.kernel_size,
             pooling_mode=self.pooling_mode,
+            forecasting=self.forecasting,
         )
 
-        cvae = CVAE(encoder, decoder, kl_weight_initial=self.kl_weight_init)
+        cvae = CVAE(
+            encoder,
+            decoder,
+            kl_weight_initial=self.kl_weight_init,
+            forecasting=self.forecasting,
+        )
         cvae.compile(
             optimizer=keras.optimizers.legacy.Adam(
                 learning_rate=learning_rate, clipnorm=1.0, clipvalue=1.0
@@ -683,6 +691,7 @@ class CreateTransformedVersionsCVAE:
         learning_rate,
         bi_rnn,
         shuffle,
+        forecasting,
         noise_scale_init,
         loss,
     ):
@@ -710,6 +719,7 @@ class CreateTransformedVersionsCVAE:
             "learning_rate": learning_rate,
             "bi_rnn": bi_rnn,
             "shuffle": shuffle,
+            "forecasting": forecasting,
             "noise_scale_init": noise_scale_init,
             "loss": loss,
             "score": score,
@@ -790,142 +800,147 @@ class CreateTransformedVersionsCVAE:
         """
         Objective function for Optuna to tune the CVAE hyperparameters.
         """
-        try:
-            latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
-            # window_size = trial.suggest_int("window_size", 6, 24)
-            patience = trial.suggest_int("patience", 20, 40, step=5)
-            kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
-            n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
-            n_blocks_decoder = trial.suggest_int("n_blocks_decoder", 1, 5)
-            n_hidden = trial.suggest_int("n_hidden", 16, 128, step=16)
-            n_layers = trial.suggest_int("n_layers", 1, 5)
-            kernel_size = trial.suggest_int("kernel_size", 2, 5)
-            pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
-            batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-            epochs = trial.suggest_int("epochs", 100, 2000, step=100)
-            learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
-            bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
-            shuffle = trial.suggest_categorical("shuffle", [True, False])
-            noise_scale_init = trial.suggest_float("noise_scale_init", 0.01, 0.5)
+        # try:
+        latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
+        # window_size = trial.suggest_int("window_size", 6, 24)
+        patience = trial.suggest_int("patience", 20, 40, step=5)
+        kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
+        n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
+        n_blocks_decoder = trial.suggest_int("n_blocks_decoder", 1, 5)
+        n_hidden = trial.suggest_int("n_hidden", 16, 128, step=16)
+        n_layers = trial.suggest_int("n_layers", 1, 5)
+        kernel_size = trial.suggest_int("kernel_size", 2, 5)
+        pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
+        batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
+        epochs = trial.suggest_int("epochs", 1, 3, step=1)
+        learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
+        bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
+        forecasting = trial.suggest_categorical("forecasting", [True, False])
+        # shuffle = trial.suggest_categorical("shuffle", [True, False])
+        noise_scale_init = trial.suggest_float("noise_scale_init", 0.01, 0.5)
 
-            # bi_rnn = True
-            # shuffle = True
+        # bi_rnn = True
+        shuffle = False
 
-            feature_dict = self._feature_engineering()
+        feature_dict = self._feature_engineering()
 
-            train_data = feature_dict["x_train_wide"]
-            train_mask = feature_dict["mask_train_wide"]
-            original_data_train_no_transf_long = feature_dict[
-                "original_data_train_no_transf_long"
-            ]
-            train_dyn_features = feature_dict["fourier_features_train"]
+        train_data = feature_dict["x_train_wide"]
+        train_mask = feature_dict["mask_train_wide"]
+        original_data_train_no_transf_long = feature_dict[
+            "original_data_train_no_transf_long"
+        ]
+        train_dyn_features = feature_dict["fourier_features_train"]
 
-            data_mask_temporalized = TemporalizeGenerator(
-                train_data,
-                train_mask,
-                train_dyn_features,
-                window_size=self.window_size,
-                stride=self.stride_temporalize,
-                batch_size=batch_size,
-                shuffle=shuffle,
-            )
+        data_mask_temporalized = TemporalizeGenerator(
+            train_data,
+            train_mask,
+            train_dyn_features,
+            window_size=self.window_size,
+            stride=self.stride_temporalize,
+            batch_size=batch_size,
+            shuffle=shuffle,
+        )
 
-            encoder, decoder = get_CVAE(
-                window_size=self.window_size,
-                n_series=self.s_train,
-                latent_dim=latent_dim,
-                bi_rnn=bi_rnn,
-                noise_scale_init=noise_scale_init,
-                n_blocks_encoder=n_blocks_encoder,
-                n_blocks_decoder=n_blocks_decoder,
-                n_hidden=n_hidden,
-                n_layers=n_layers,
-                kernel_size=kernel_size,
-                pooling_mode=pooling_mode,
-            )
+        encoder, decoder = get_CVAE(
+            window_size=self.window_size,
+            n_series=self.s_train,
+            latent_dim=latent_dim,
+            bi_rnn=bi_rnn,
+            noise_scale_init=noise_scale_init,
+            n_blocks_encoder=n_blocks_encoder,
+            n_blocks_decoder=n_blocks_decoder,
+            n_hidden=n_hidden,
+            n_layers=n_layers,
+            kernel_size=kernel_size,
+            pooling_mode=pooling_mode,
+            forecasting=forecasting,
+        )
 
-            cvae = CVAE(encoder, decoder, kl_weight_initial=kl_weight)
-            cvae.compile(
-                optimizer=keras.optimizers.legacy.Adam(learning_rate=learning_rate),
-                metrics=[cvae.reconstruction_loss_tracker, cvae.kl_loss_tracker],
-            )
+        cvae = CVAE(
+            encoder, decoder, kl_weight_initial=kl_weight, forecasting=forecasting
+        )
+        cvae.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
+            metrics=[cvae.reconstruction_loss_tracker, cvae.kl_loss_tracker],
+        )
 
-            es = EarlyStopping(
-                patience=self.patience,
-                verbose=1,
-                monitor="loss",
-                mode="auto",
-                restore_best_weights=True,
-            )
+        es = EarlyStopping(
+            patience=self.patience,
+            verbose=1,
+            monitor="loss",
+            mode="auto",
+            restore_best_weights=True,
+        )
 
-            history = cvae.fit(
-                x=data_mask_temporalized,
-                epochs=epochs,
-                batch_size=batch_size,
-                callbacks=[es],
-            )
+        history = cvae.fit(
+            x=data_mask_temporalized,
+            epochs=epochs,
+            batch_size=batch_size,
+            callbacks=[es],
+        )
 
-            loss = min(history.history["loss"])
+        loss = min(history.history["loss"])
 
-            _, synthetic_data_long_no_transf = self.predict_train(
-                cvae,
-                data_mask_temporalized=data_mask_temporalized,
-                samples=data_mask_temporalized.indices.shape[0],
-                window_size=self.window_size,
-                latent_dim=latent_dim,
-            )
+        _, synthetic_data_long_no_transf = self.predict_train(
+            cvae,
+            data_mask_temporalized=data_mask_temporalized,
+            samples=data_mask_temporalized.indices.shape[0],
+            window_size=self.window_size,
+            latent_dim=latent_dim,
+        )
 
-            # compute the discriminative score x times to account for variability
+        # compute the discriminative score x times to account for variability
 
-            score = self.compute_mean_discriminative_score(
-                unique_ids=original_data_train_no_transf_long["unique_id"].unique(),
-                original_data=original_data_train_no_transf_long,
-                synthetic_data=synthetic_data_long_no_transf,
-                method="hitgen",
-                freq="M",
-                dataset_name=self.dataset_name,
-                dataset_group=self.dataset_group,
-                loss=loss,
-                generate_feature_plot=False,
-                store_score=False,
-                store_features_synth=False,
-                split="hypertuning",
-            )
+        score = self.compute_mean_discriminative_score(
+            unique_ids=original_data_train_no_transf_long["unique_id"].unique(),
+            original_data=original_data_train_no_transf_long,
+            synthetic_data=synthetic_data_long_no_transf,
+            method="hitgen",
+            freq="M",
+            dataset_name=self.dataset_name,
+            dataset_group=self.dataset_group,
+            loss=loss,
+            generate_feature_plot=False,
+            store_score=False,
+            store_features_synth=False,
+            split="hypertuning",
+        )
 
-            if score is None:
-                print("No valid scores computed. Pruning this trial.")
-                raise optuna.exceptions.TrialPruned()
-
-            self.update_best_scores(
-                original_data_train_no_transf_long,
-                synthetic_data_long_no_transf,
-                score,
-                latent_dim,
-                self.window_size,
-                patience,
-                kl_weight,
-                n_blocks_encoder,
-                n_blocks_decoder,
-                n_hidden,
-                n_layers,
-                kernel_size,
-                pooling_mode,
-                batch_size,
-                epochs,
-                learning_rate,
-                bi_rnn,
-                shuffle,
-                noise_scale_init,
-                loss,
-            )
-
-            return score
-
-        except Exception as e:
-            print(f"Error in trial: {e}")
+        if score is None:
+            print("No valid scores computed. Pruning this trial.")
             raise optuna.exceptions.TrialPruned()
 
-    def hyper_tune_and_train(self, n_trials=30):
+        self.update_best_scores(
+            original_data_train_no_transf_long,
+            synthetic_data_long_no_transf,
+            score,
+            latent_dim,
+            self.window_size,
+            patience,
+            kl_weight,
+            n_blocks_encoder,
+            n_blocks_decoder,
+            n_hidden,
+            n_layers,
+            kernel_size,
+            pooling_mode,
+            batch_size,
+            epochs,
+            learning_rate,
+            bi_rnn,
+            shuffle,
+            forecasting,
+            noise_scale_init,
+            loss,
+        )
+
+        return score
+
+        # except Exception as e:
+        #     print(f"Error in trial: {e}")
+        #     raise optuna.exceptions.TrialPruned()
+
+    def hyper_tune_and_train(self, n_trials=3):
         """
         Run Optuna hyperparameter tuning for the CVAE and train the best model.
         """
@@ -977,9 +992,15 @@ class CreateTransformedVersionsCVAE:
             n_layers=self.best_params["n_layers"],
             kernel_size=self.best_params["kernel_size"],
             pooling_mode=self.best_params["pooling_mode"],
+            forecasting=self.best_params["forecasting"],
         )
 
-        cvae = CVAE(encoder, decoder, kl_weight_initial=self.best_params["kl_weight"])
+        cvae = CVAE(
+            encoder,
+            decoder,
+            kl_weight_initial=self.best_params["kl_weight"],
+            forecasting=self.best_params["forecasting"],
+        )
         cvae.compile(
             optimizer=keras.optimizers.legacy.Adam(
                 learning_rate=self.best_params["learning_rate"]
@@ -1040,7 +1061,7 @@ class CreateTransformedVersionsCVAE:
         alpha = 3  # x times bigger variance
         epsilon = np.random.normal(size=z_mean.shape) * 0.1
         z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
-        generated_data = cvae.decoder.predict(
+        generated_data, predictions = cvae.decoder.predict(
             [
                 z_augmented,
                 data_mask_temporalized.temporalized_mask,
@@ -1100,7 +1121,7 @@ class CreateTransformedVersionsCVAE:
         alpha = 3  # x times bigger variance
         epsilon = np.random.normal(size=z_mean.shape) * 0.1
         z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
-        generated_data = cvae.decoder.predict(
+        generated_data, predictions = cvae.decoder.predict(
             [
                 z_augmented,
                 data_mask_temporalized.temporalized_mask,
