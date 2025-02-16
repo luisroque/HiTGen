@@ -968,6 +968,15 @@ class CreateTransformedVersionsCVAE:
             load_if_exists=True,
         )
 
+        if len(study.trials) == 0:
+            print("No trials have been completed yet. Running hyperparameter tuning...")
+            study.optimize(self.objective, n_trials=n_trials)
+
+        if len(study.trials) == 0:
+            raise RuntimeError(
+                "Optuna tuning did not complete successfully. No trials were found."
+            )
+
         # retrieve the best trial
         best_trial = study.best_trial
         self.best_params = best_trial.params
