@@ -962,9 +962,6 @@ class CreateTransformedVersionsCVAE:
         dyn_features_train = feature_dict["fourier_features_train"]
 
         study = optuna.create_study(
-            study_name="opt_vae", direction="minimize", load_if_exists=True
-        )
-        study = optuna.create_study(
             study_name=study_name,
             storage=storage,
             direction="minimize",
