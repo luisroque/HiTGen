@@ -1,4 +1,5 @@
 import os
+import gc
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -934,6 +935,12 @@ class CreateTransformedVersionsCVAE:
             loss,
         )
 
+        # clean GPU memory between trials
+        del cvae, encoder, decoder
+        tf.keras.backend.clear_session()
+        gc.collect()
+        os.system("nvidia-smi --gpu-reset")
+
         return score
 
         # except Exception as e:
@@ -944,6 +951,10 @@ class CreateTransformedVersionsCVAE:
         """
         Run Optuna hyperparameter tuning for the CVAE and train the best model.
         """
+        study_name = "opt_vae"
+
+        storage = "sqlite:///optuna_study.db"
+
         feature_dict = self._feature_engineering()
 
         data_train = feature_dict["x_train_wide"]
@@ -953,7 +964,12 @@ class CreateTransformedVersionsCVAE:
         study = optuna.create_study(
             study_name="opt_vae", direction="minimize", load_if_exists=True
         )
-        study.optimize(self.objective, n_trials=n_trials)
+        study = optuna.create_study(
+            study_name=study_name,
+            storage=storage,
+            direction="minimize",
+            load_if_exists=True,
+        )
 
         # retrieve the best trial
         best_trial = study.best_trial
