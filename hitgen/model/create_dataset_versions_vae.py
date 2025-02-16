@@ -816,12 +816,13 @@ class CreateTransformedVersionsCVAE:
         epochs = trial.suggest_int("epochs", 200, 2000, step=100)
         learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
         # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
-        forecasting = trial.suggest_categorical("forecasting", [True, False])
+        # forecasting = trial.suggest_categorical("forecasting", [True, False])
         # shuffle = trial.suggest_categorical("shuffle", [True, False])
         noise_scale_init = trial.suggest_float("noise_scale_init", 0.01, 0.5)
 
         bi_rnn = False
         shuffle = False
+        forecasting = True
 
         feature_dict = self._feature_engineering()
 
