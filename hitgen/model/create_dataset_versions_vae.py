@@ -982,14 +982,15 @@ class CreateTransformedVersionsCVAE:
         best_trial = study.best_trial
         self.best_params = best_trial.params
 
+        self.best_params["bi_rnn"] = False
+        self.best_params["shuffle"] = False
+        self.best_params["forecasting"] = True
+
         with open(
             f"assets/model_weights/{self.dataset_name}_{self.dataset_group}_best_params.json",
             "w",
         ) as f:
             json.dump(self.best_params, f)
-
-        self.best_params["bi_rnn"] = False
-        self.best_params["shuffle"] = True
 
         print(f"Best Hyperparameters: {self.best_params}")
 
