@@ -772,7 +772,14 @@ class CreateTransformedVersionsCVAE:
         """
         # try:
         latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
-        window_size = trial.suggest_int("window_size", 4, 24)
+        if self.freq == "M" or self.freq == "MS":
+            window_size = trial.suggest_int("window_size", 6, 24, step=3)
+        elif self.freq == "Q" or self.freq == "QS":
+            window_size = trial.suggest_int("window_size", 4, 12, step=2)
+        elif self.freq == "Y" or self.freq == "YS":
+            window_size = trial.suggest_int("window_size", 2, 6, step=1)
+        else:
+            window_size = trial.suggest_int("window_size", 4, 24, step=1)
         patience = trial.suggest_int("patience", 20, 40, step=5)
         kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
         n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
@@ -782,7 +789,7 @@ class CreateTransformedVersionsCVAE:
         kernel_size = trial.suggest_int("kernel_size", 2, 5)
         pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
         batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-        epochs = trial.suggest_int("epochs", 200, 2000, step=100)
+        epochs = trial.suggest_int("epochs", 200, 1600, step=100)
         learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
         # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
         # forecasting = trial.suggest_categorical("forecasting", [True, False])
