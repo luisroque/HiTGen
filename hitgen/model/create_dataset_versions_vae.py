@@ -946,9 +946,9 @@ class CreateTransformedVersionsCVAE:
 
         feature_dict = self._feature_engineering()
 
-        data_train = feature_dict["x_train_wide"]
-        mask_train = feature_dict["mask_train_wide"]
-        dyn_features_train = feature_dict["fourier_features_train"]
+        original_data = feature_dict["x_original_wide"]
+        original_mask = feature_dict["mask_original_wide"]
+        original_features = feature_dict["fourier_features_original"]
 
         study = optuna.create_study(
             study_name=study_name,
@@ -983,11 +983,10 @@ class CreateTransformedVersionsCVAE:
         print(f"Best Hyperparameters: {self.best_params}")
 
         data_mask_temporalized = TemporalizeGenerator(
-            data_train,
-            mask_train,
-            dyn_features_train,
+            original_data,
+            original_mask,
+            original_features,
             window_size=self.best_params["window_size"],
-            stride=self.stride_temporalize,
             batch_size=self.best_params["batch_size"],
             shuffle=self.best_params["shuffle"],
         )
