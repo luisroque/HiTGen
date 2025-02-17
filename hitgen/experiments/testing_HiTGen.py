@@ -1,4 +1,6 @@
 import multiprocessing
+import os
+import argparse
 import pandas as pd
 from hitgen.model.models import (
     TemporalizeGenerator,
@@ -365,8 +367,30 @@ def has_final_score_in_tuple(tpl):
     return isinstance(tpl[1], dict) and "final_score" in tpl[1]
 
 
+def set_device(
+    use_gpu: bool,
+):
+    """Configures TensorFlow to use GPU or CPU."""
+    if not use_gpu:
+        print("Using CPU as specified by the user.")
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+
 if __name__ == "__main__":
     multiprocessing.set_start_method("spawn")
+
+    parser = argparse.ArgumentParser(
+        description="Run synthetic data generation using HiTGen."
+    )
+    parser.add_argument(
+        "--use-gpu",
+        action="store_true",
+        help="Use GPU if available (default: False, meaning it runs on CPU).",
+    )
+    args = parser.parse_args()
+
+    set_device(args.use_gpu)
+
     results = []
 
     for DATASET, SUBGROUPS in DATASET_GROUP_FREQ.items():
