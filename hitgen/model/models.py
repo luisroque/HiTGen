@@ -743,7 +743,7 @@ def decoder(
         padding="same",
         activation=None,
         kernel_regularizer=regularizers.l2(0.001),
-        name="conv1_decoder_final",
+        name="conv1_decoder_backcast_final",
     )(backcast_out)
 
     backcast_out = layers.Multiply(name="masked_output")([backcast_out, mask_input])
@@ -785,7 +785,7 @@ def decoder(
             padding="same",
             activation=None,
             kernel_regularizer=regularizers.l2(0.001),
-            name="conv1_decoder_final",
+            name="conv1_decoder_forecast_final",
         )(forecast_out)
 
         forecast_out = layers.Multiply(name="masked_forecast_output")(
