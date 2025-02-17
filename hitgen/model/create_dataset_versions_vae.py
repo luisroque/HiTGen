@@ -603,7 +603,7 @@ class CreateTransformedVersionsCVAE:
             forecasting=self.forecasting,
         )
         cvae.compile(
-            optimizer=keras.optimizers.legacy.Adam(
+            optimizer=keras.optimizers.Adam(
                 learning_rate=learning_rate, clipnorm=1.0, clipvalue=1.0
             ),
             metrics=[cvae.reconstruction_loss_tracker, cvae.kl_loss_tracker],
@@ -1026,7 +1026,7 @@ class CreateTransformedVersionsCVAE:
             forecasting=self.best_params["forecasting"],
         )
         cvae.compile(
-            optimizer=keras.optimizers.legacy.Adam(
+            optimizer=keras.optimizers.Adam(
                 learning_rate=self.best_params["learning_rate"]
             ),
             metrics=[cvae.reconstruction_loss_tracker, cvae.kl_loss_tracker],
