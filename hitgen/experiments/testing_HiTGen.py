@@ -472,13 +472,10 @@ if __name__ == "__main__":
                 dataset_name=DATASET,
                 dataset_group=DATASET_GROUP,
                 freq=FREQ,
-                top=TOP,
                 window_size=WINDOW_SIZE,
-                stride_temporalize=STRIDE_TEMPORALIZE_HITGEN,
                 batch_size=BATCH_SIZE_HITGEN,
                 shuffle=SHUFFLE_HITGEN,
                 bi_rnn=BI_RNN_HITGEN,
-                annealing=ANNEALING_HITGEN,
                 noise_scale_init=NOISE_SAMPLE_INIT,
                 kl_weight_init=KL_WEIGHT_INIT,
                 n_blocks_encoder=N_BLOCKS_ENCODER_HITGEN,
@@ -523,7 +520,6 @@ if __name__ == "__main__":
                 original_mask,
                 original_dyn_features,
                 window_size=WINDOW_SIZE,
-                stride=create_dataset_vae.stride_temporalize,
                 batch_size=BATCH_SIZE_HITGEN,
                 shuffle=SHUFFLE_HITGEN,
             )
@@ -532,9 +528,6 @@ if __name__ == "__main__":
                 create_dataset_vae.predict(
                     model,
                     data_mask_temporalized=data_mask_temporalized,
-                    samples=data_mask_temporalized.indices.shape[0],
-                    window_size=WINDOW_SIZE,
-                    latent_dim=LATENT_DIM_HITGEN,
                 )
             )
 

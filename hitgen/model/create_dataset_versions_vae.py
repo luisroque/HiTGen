@@ -82,20 +82,15 @@ class CreateTransformedVersionsCVAE:
         dataset_group: str,
         freq: str,
         batch_size: int = 8,
-        shuffle: bool = True,
+        shuffle: bool = False,
         input_dir: str = "./assets/",
-        transf_data: str = "whole",
-        top: int = None,
-        window_size: int = 12,
-        weekly_m5: bool = True,
+        window_size: int = 6,
         test_size: int = None,
         num_base_series_time_points: int = 100,
-        num_latent_dim: int = 3,
         num_variants: int = 20,
         noise_scale: float = 0.1,
         amplitude: float = 1.0,
-        stride_temporalize: int = 2,
-        bi_rnn: bool = True,
+        bi_rnn: bool = False,
         forecasting: bool = True,
         conv1d_blocks_backcast=2,
         filters_backcast=64,
@@ -103,9 +98,8 @@ class CreateTransformedVersionsCVAE:
         conv1d_blocks_forecast=2,
         filters_forecast=64,
         kernel_size_forecast=3,
-        annealing: bool = True,
-        kl_weight_init: float = None,
-        noise_scale_init: float = None,
+        kl_weight_init: float = 0.1,
+        noise_scale_init: float = 0.1,
         n_blocks_encoder: int = 3,
         n_blocks_decoder: int = 3,
         n_hidden: int = 16,
@@ -117,22 +111,16 @@ class CreateTransformedVersionsCVAE:
         self.dataset_name = dataset_name
         self.dataset_group = dataset_group
         self.input_dir = input_dir
-        self.transf_data = transf_data
         self.freq = freq
-        self.top = top
         self.test_size = test_size
-        self.weekly_m5 = weekly_m5
         self.num_base_series_time_points = num_base_series_time_points
-        self.num_latent_dim = num_latent_dim
         self.num_variants = num_variants
         self.noise_scale = noise_scale
         self.amplitude = amplitude
-        self.stride_temporalize = stride_temporalize
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.bi_rnn = bi_rnn
         self.forecasting = forecasting
-        self.annealing = annealing
         self.kl_weight_init = kl_weight_init
         self.noise_scale_init = noise_scale_init
         self.n_blocks_encoder = n_blocks_encoder
@@ -205,28 +193,6 @@ class CreateTransformedVersionsCVAE:
         data_long = df.melt(id_vars=["ds"], var_name="unique_id", value_name="y")
 
         return data_long
-
-    def _get_dataset(self):
-        """
-        Get dataset and apply preprocessing
-        """
-        ppc_args = {
-            "dataset": self.dataset_name,
-            "freq": self.freq,
-            "input_dir": self.input_dir,
-            "top": self.top,
-            "test_size": self.test_size,
-            "weekly_m5": self.weekly_m5,
-            "num_base_series_time_points": self.num_base_series_time_points,
-            "num_latent_dim": self.num_latent_dim,
-            "num_variants": self.num_variants,
-            "noise_scale": self.noise_scale,
-            "amplitude": self.amplitude,
-        }
-
-        dataset = ppc(**ppc_args).apply_preprocess()
-
-        return dataset
 
     def _create_directories(self):
         """
@@ -588,7 +554,6 @@ class CreateTransformedVersionsCVAE:
             original_mask,
             original_features,
             window_size=self.window_size,
-            stride=self.stride_temporalize,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
         )
@@ -879,7 +844,6 @@ class CreateTransformedVersionsCVAE:
             train_mask,
             train_dyn_features,
             window_size=self.window_size,
-            stride=self.stride_temporalize,
             batch_size=batch_size,
             shuffle=shuffle,
         )
@@ -1052,7 +1016,6 @@ class CreateTransformedVersionsCVAE:
             mask_train,
             dyn_features_train,
             window_size=self.best_params["latent_dim"],
-            stride=self.stride_temporalize,
             batch_size=self.best_params["batch_size"],
             shuffle=self.best_params["shuffle"],
         )
@@ -1111,9 +1074,6 @@ class CreateTransformedVersionsCVAE:
         self,
         cvae: CVAE,
         data_mask_temporalized,
-        samples,
-        window_size,
-        latent_dim,
         train_test_split=0.7,
         train_size_absolute=None,
     ) -> Tuple[
@@ -1181,9 +1141,6 @@ class CreateTransformedVersionsCVAE:
         self,
         cvae: CVAE,
         data_mask_temporalized,
-        samples,
-        window_size,
-        latent_dim,
         train_test_split=0.7,
         train_size_absolute=None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
