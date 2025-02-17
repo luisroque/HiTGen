@@ -125,7 +125,6 @@ class CreateTransformedVersionsCVAE:
         print(f"   - Average number of time points per series: {avg_time_points:.2f}")
 
         self.features_input = (None, None, None)
-        self._create_directories()
         self.long_properties = {}
         self.split_path = f"assets/model_weights/data_split/{dataset_name}_{dataset_group}_data_split.json"
         self.unique_ids = self.df["unique_id"].unique()
