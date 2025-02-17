@@ -64,7 +64,6 @@ class CreateTransformedVersionsCVAE:
         input_dir: str = "./assets/",
         transf_data: str = "whole",
         top: int = None,
-        window_size: int = 6,
         weekly_m5: bool = True,
         test_size: int = None,
         num_base_series_time_points: int = 100,
@@ -128,7 +127,6 @@ class CreateTransformedVersionsCVAE:
             self.dataset_name, self.dataset_group
         )
         self.s_train = None
-        self.window_size = window_size
         self.y = self.data
         self.n = self.data.shape[0]
         self.df = pd.DataFrame(self.data)

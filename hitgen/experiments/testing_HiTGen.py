@@ -270,7 +270,6 @@ if __name__ == "__main__":
 
             # HITGEN Configurations
             # hitgen_config = dataset_config["hitgen"]
-            WINDOW_SIZE = 6
 
             # TIMEGAN Configurations
             # timegan_config = dataset_config["timegan"]
@@ -289,7 +288,6 @@ if __name__ == "__main__":
                 dataset_group=DATASET_GROUP,
                 freq=FREQ,
                 top=TOP,
-                window_size=WINDOW_SIZE,
             )
 
             # hypertuning
