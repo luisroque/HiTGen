@@ -35,6 +35,12 @@ DATASETS_HYPERPARAMS_CONFIGS = {
                 "learning_rate": 0.0004126982903382817,
                 "bi_rnn": True,
                 "shuffle": False,
+                "conv1d_blocks_backcast": 2,
+                "filters_backcast": 64,
+                "kernel_size_backcast": 3,
+                "conv1d_blocks_forecast": 2,
+                "filters_forecast": 64,
+                "kernel_size_forecast": 3,
                 "noise_scale_init": 0.2931368012943831,
                 "loss": 0.0016558588249608874,
                 "score": 0.834054834054834,
@@ -442,6 +448,12 @@ if __name__ == "__main__":
             SHUFFLE_HITGEN = hitgen_config["shuffle"]
             BI_RNN_HITGEN = hitgen_config["bi_rnn"]
             ANNEALING_HITGEN = False
+            CONV1D_BLOCKS_BACKCAST_HITGEN = hitgen_config["conv1d_blocks_backcast"]
+            FILTERS_BACKCAST_HITGEN = hitgen_config["filters_backcast"]
+            KERNEL_SIZE_BACKCAST_HITGEN = hitgen_config["kernel_size_backcast"]
+            CONV1D_BLOCKS_FORECAST_HITGEN = hitgen_config["conv1d_blocks_forecast"]
+            FILTERS_FORECAST_HITGEN = hitgen_config["filters_forecast"]
+            KERNEL_SIZE_FORECAST_HITGEN = hitgen_config["kernel_size_forecast"]
 
             # TIMEGAN Configurations
             # timegan_config = dataset_config["timegan"]
@@ -473,6 +485,12 @@ if __name__ == "__main__":
                 n_hidden=N_HIDDEN_HITGEN,
                 n_layers=N_LAYERS_HITGENS,
                 patience=PATIENCE_HITGEN,
+                conv1d_blocks_backcast=CONV1D_BLOCKS_BACKCAST_HITGEN,
+                filters_backcast=FILTERS_BACKCAST_HITGEN,
+                kernel_size_backcast=KERNEL_SIZE_BACKCAST_HITGEN,
+                conv1d_blocks_forecast=CONV1D_BLOCKS_FORECAST_HITGEN,
+                filters_forecast=FILTERS_FORECAST_HITGEN,
+                kernel_size_forecast=KERNEL_SIZE_FORECAST_HITGEN,
             )
 
             # hypertuning

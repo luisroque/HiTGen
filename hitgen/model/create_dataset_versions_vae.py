@@ -97,6 +97,12 @@ class CreateTransformedVersionsCVAE:
         stride_temporalize: int = 2,
         bi_rnn: bool = True,
         forecasting: bool = True,
+        conv1d_blocks_backcast=2,
+        filters_backcast=64,
+        kernel_size_backcast=3,
+        conv1d_blocks_forecast=2,
+        filters_forecast=64,
+        kernel_size_forecast=3,
         annealing: bool = True,
         kl_weight_init: float = None,
         noise_scale_init: float = None,
@@ -136,6 +142,12 @@ class CreateTransformedVersionsCVAE:
         self.patience = patience
         self.kernel_size = kernel_size
         self.pooling_mode = pooling_mode
+        self.conv1d_blocks_backcast = conv1d_blocks_backcast
+        self.filters_backcast = filters_backcast
+        self.kernel_size_backcast = kernel_size_backcast
+        self.conv1d_blocks_forecast = conv1d_blocks_forecast
+        self.filters_forecast = filters_forecast
+        self.kernel_size_forecast = kernel_size_forecast
         (self.data, self.s, self.freq) = self.load_data(
             self.dataset_name, self.dataset_group
         )
@@ -594,6 +606,12 @@ class CreateTransformedVersionsCVAE:
             kernel_size=self.kernel_size,
             pooling_mode=self.pooling_mode,
             forecasting=self.forecasting,
+            conv1d_blocks_backcast=self.conv1d_blocks_backcast,
+            filters_backcast=self.filters_backcast,
+            kernel_size_backcast=self.kernel_size_backcast,
+            conv1d_blocks_forecast=self.conv1d_blocks_forecast,
+            filters_forecast=self.filters_forecast,
+            kernel_size_forecast=self.kernel_size_forecast,
         )
 
         cvae = CVAE(
@@ -693,6 +711,12 @@ class CreateTransformedVersionsCVAE:
         bi_rnn,
         shuffle,
         forecasting,
+        conv1d_blocks_backcast,
+        filters_backcast,
+        kernel_size_backcast,
+        conv1d_blocks_forecast,
+        filters_forecast,
+        kernel_size_forecast,
         noise_scale_init,
         loss,
     ):
@@ -721,6 +745,12 @@ class CreateTransformedVersionsCVAE:
             "bi_rnn": bi_rnn,
             "shuffle": shuffle,
             "forecasting": forecasting,
+            "conv1d_blocks_backcast": conv1d_blocks_backcast,
+            "filters_backcast": filters_backcast,
+            "kernel_size_backcast": kernel_size_backcast,
+            "conv1d_blocks_forecast": conv1d_blocks_forecast,
+            "filters_forecast": filters_forecast,
+            "kernel_size_forecast": kernel_size_forecast,
             "noise_scale_init": noise_scale_init,
             "loss": loss,
             "score": score,
@@ -819,6 +849,16 @@ class CreateTransformedVersionsCVAE:
         # forecasting = trial.suggest_categorical("forecasting", [True, False])
         # shuffle = trial.suggest_categorical("shuffle", [True, False])
         noise_scale_init = trial.suggest_float("noise_scale_init", 0.01, 0.5)
+        conv1d_blocks_backcast = trial.suggest_int(
+            "conv1d_blocks_backcast", 1, 5, step=1
+        )
+        filters_backcast = trial.suggest_int("filters_backcast", 16, 256, step=16)
+        kernel_size_backcast = trial.suggest_int("kernel_size_backcast", 2, 4, step=1)
+        conv1d_blocks_forecast = (
+            trial.suggest_int("conv1d_blocks_forecast", 1, 5, step=1),
+        )
+        filters_forecast = trial.suggest_int("filters_forecast", 16, 256, step=16)
+        kernel_size_forecast = trial.suggest_int("kernel_size_forecast", 2, 4, step=1)
 
         bi_rnn = False
         shuffle = False
@@ -856,6 +896,12 @@ class CreateTransformedVersionsCVAE:
             kernel_size=kernel_size,
             pooling_mode=pooling_mode,
             forecasting=forecasting,
+            conv1d_blocks_backcast=conv1d_blocks_backcast,
+            filters_backcast=filters_backcast,
+            kernel_size_backcast=kernel_size_backcast,
+            conv1d_blocks_forecast=conv1d_blocks_forecast,
+            filters_forecast=filters_forecast,
+            kernel_size_forecast=kernel_size_forecast,
         )
 
         cvae = CVAE(
@@ -932,6 +978,12 @@ class CreateTransformedVersionsCVAE:
             bi_rnn,
             shuffle,
             forecasting,
+            conv1d_blocks_backcast,
+            filters_backcast,
+            kernel_size_backcast,
+            conv1d_blocks_forecast,
+            filters_forecast,
+            kernel_size_forecast,
             noise_scale_init,
             loss,
         )

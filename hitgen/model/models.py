@@ -406,6 +406,12 @@ def get_CVAE(
     n_hidden: int = 64,
     n_layers: int = 2,
     kernel_size: int = 2,
+    conv1d_blocks_backcast=2,
+    filters_backcast=64,
+    kernel_size_backcast=3,
+    conv1d_blocks_forecast=2,
+    filters_forecast=64,
+    kernel_size_forecast=3,
     pooling_mode: str = "max",
     forecasting: bool = True,
 ) -> tuple[tf.keras.Model, tf.keras.Model]:
@@ -439,6 +445,12 @@ def get_CVAE(
         kernel_size=kernel_size,
         pooling_mode=pooling_mode,
         forecasting=forecasting,
+        conv1d_blocks_backcast=conv1d_blocks_backcast,
+        filters_backcast=filters_backcast,
+        kernel_size_backcast=kernel_size_backcast,
+        conv1d_blocks_forecast=conv1d_blocks_forecast,
+        filters_forecast=filters_forecast,
+        kernel_size_forecast=kernel_size_forecast,
     )
 
     return enc, dec
@@ -626,6 +638,12 @@ def decoder(
     n_hidden=64,
     n_layers=2,
     kernel_size=2,
+    conv1d_blocks_backcast=2,
+    filters_backcast=64,
+    kernel_size_backcast=3,
+    conv1d_blocks_forecast=2,
+    filters_forecast=64,
+    kernel_size_forecast=3,
     pooling_mode="max",
     bi_rnn=True,
     forecasting=True,
@@ -707,16 +725,24 @@ def decoder(
 
         final_backcast += backcast
 
+    backcast_out = final_backcast
     # --- Backcast output (Reconstruction of Past) ---
-    backcast_out = layers.Flatten(name="flatten_decoder_output_CVAE")(final_backcast)
-    backcast_out = layers.Dense(
-        time_steps * num_features,
+    for _ in range(conv1d_blocks_backcast):
+        backcast_out = layers.Conv1D(
+            filters=filters_backcast,
+            kernel_size=kernel_size_backcast,
+            padding="same",
+            activation=tf.keras.layers.LeakyReLU(alpha=0.01),
+            kernel_regularizer=regularizers.l2(0.001),
+        )(backcast_out)
+
+    backcast_out = layers.Conv1D(
+        filters=num_features,
+        kernel_size=1,
+        padding="same",
+        activation=None,
         kernel_regularizer=regularizers.l2(0.001),
-        activation=tf.keras.layers.LeakyReLU(alpha=0.01),
-        name="dense_output_CVAE",
-    )(backcast_out)
-    backcast_out = layers.Reshape(
-        (time_steps, num_features), name="reshape_final_output_CVAE"
+        name="conv1_decoder_final",
     )(backcast_out)
 
     backcast_out = layers.Multiply(name="masked_output")([backcast_out, mask_input])
@@ -742,17 +768,23 @@ def decoder(
 
             final_forecast += forecast
 
-        forecast_out = layers.Flatten(name="flatten_forecast_output_CVAE")(
-            final_forecast
-        )
-        forecast_out = layers.Dense(
-            time_steps * num_features,
+        forecast_out = final_forecast
+        for _ in range(conv1d_blocks_forecast):
+            forecast_out = layers.Conv1D(
+                filters=filters_forecast,
+                kernel_size=kernel_size_forecast,
+                padding="same",
+                activation=tf.keras.layers.LeakyReLU(alpha=0.01),
+                kernel_regularizer=regularizers.l2(0.001),
+            )(forecast_out)
+
+        forecast_out = layers.Conv1D(
+            filters=num_features,
+            kernel_size=1,
+            padding="same",
+            activation=None,
             kernel_regularizer=regularizers.l2(0.001),
-            activation=tf.keras.layers.LeakyReLU(alpha=0.01),
-            name="dense_forecast_CVAE",
-        )(forecast_out)
-        forecast_out = layers.Reshape(
-            (time_steps, num_features), name="reshape_forecast_output_CVAE"
+            name="conv1_decoder_final",
         )(forecast_out)
 
         forecast_out = layers.Multiply(name="masked_forecast_output")(
