@@ -42,28 +42,6 @@ class InvalidFrequencyError(Exception):
 class CreateTransformedVersionsCVAE:
     """
     Class for creating transformed versions of the dataset using a Conditional Variational Autoencoder (CVAE).
-
-    This class contains several methods to preprocess data, fit a CVAE, generate new time series, and
-    save transformed versions of the dataset. It's designed to be used with time-series data.
-
-    The class follows the Singleton design pattern ensuring that only one instance can exist.
-
-    Args:
-        dataset_name: Name of the dataset.
-        freq: Frequency of the time series data.
-        input_dir: Directory where the input data is located. Defaults to "./".
-        transf_data: Type of transformation applied to the data. Defaults to "whole".
-        top: Number of top series to select. Defaults to None.
-        window_size: Window size for the sliding window. Defaults to 10.
-        weekly_m5: If True, use the M5 competition's weekly grouping. Defaults to True.
-        test_size: Size of the test set. If None, the size is determined automatically. Defaults to None.
-
-        Below are parameters for the synthetic data creation:
-            num_base_series_time_points: Number of base time points in the series. Defaults to 100.
-            num_latent_dim: Dimension of the latent space. Defaults to 3.
-            num_variants: Number of variants for the transformation. Defaults to 20.
-            noise_scale: Scale of the Gaussian noise. Defaults to 0.1.
-            amplitude: Amplitude of the time series data. Defaults to 1.0.
     """
 
     _instance = None
@@ -83,11 +61,7 @@ class CreateTransformedVersionsCVAE:
         freq: str,
         batch_size: int = 8,
         shuffle: bool = False,
-        input_dir: str = "./assets/",
         window_size: int = 6,
-        test_size: int = None,
-        num_base_series_time_points: int = 100,
-        num_variants: int = 20,
         noise_scale: float = 0.1,
         amplitude: float = 1.0,
         bi_rnn: bool = False,
@@ -110,11 +84,7 @@ class CreateTransformedVersionsCVAE:
     ):
         self.dataset_name = dataset_name
         self.dataset_group = dataset_group
-        self.input_dir = input_dir
         self.freq = freq
-        self.test_size = test_size
-        self.num_base_series_time_points = num_base_series_time_points
-        self.num_variants = num_variants
         self.noise_scale = noise_scale
         self.amplitude = amplitude
         self.batch_size = batch_size
@@ -193,13 +163,6 @@ class CreateTransformedVersionsCVAE:
         data_long = df.melt(id_vars=["ds"], var_name="unique_id", value_name="y")
 
         return data_long
-
-    def _create_directories(self):
-        """
-        Create dynamically the directories to store the data if they don't exist
-        """
-        # Create directory to store transformed datasets if does not exist
-        Path(f"{self.input_dir}data").mkdir(parents=True, exist_ok=True)
 
     def _load_or_create_split(
         self,

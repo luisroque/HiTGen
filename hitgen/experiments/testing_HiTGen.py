@@ -20,29 +20,7 @@ DATASETS_HYPERPARAMS_CONFIGS = {
     "Tourism": {
         "Monthly": {
             "hitgen": {
-                "latent_dim": 136,
                 "window_size": 6,
-                "patience": 30,
-                "kl_weight": 0.43050068783865714,
-                "n_blocks_encoder": 2,
-                "n_blocks_decoder": 3,
-                "n_hidden": 48,
-                "n_layers": 5,
-                "kernel_size": 2,
-                "pooling_mode": "average",
-                "batch_size": 16,
-                "epochs": 400,
-                "learning_rate": 2.928465251011121e-05,
-                "bi_rnn": False,
-                "shuffle": False,
-                "forecasting": True,
-                "conv1d_blocks_backcast": 4,
-                "filters_backcast": 112,
-                "kernel_size_backcast": 2,
-                "conv1d_blocks_forecast": 1,
-                "filters_forecast": 48,
-                "kernel_size_forecast": 3,
-                "noise_scale_init": 0.09539530812184871,
                 "loss": 0.06484322994947433,
                 "score": 0.7752525252525252,
             },
@@ -432,29 +410,6 @@ if __name__ == "__main__":
             # HITGEN Configurations
             hitgen_config = dataset_config["hitgen"]
             WINDOW_SIZE = hitgen_config["window_size"]
-            LATENT_DIM_HITGEN = hitgen_config["latent_dim"]
-            EPOCHS_HITGEN = hitgen_config["epochs"]
-            BATCH_SIZE_HITGEN = hitgen_config["batch_size"]
-            KL_WEIGHT_INIT = hitgen_config["kl_weight"]
-            NOISE_SAMPLE_INIT = hitgen_config["noise_scale_init"]
-            N_BLOCKS_ENCODER_HITGEN = hitgen_config["n_blocks_encoder"]
-            N_BLOCKS_DECODER_HITGEN = hitgen_config["n_blocks_decoder"]
-            N_HIDDEN_HITGEN = hitgen_config["n_hidden"]
-            N_LAYERS_HITGENS = hitgen_config["n_layers"]
-            KERNEL_SIZE_HITGEN = hitgen_config["kernel_size"]
-            POOLING_MODE_HITGEN = hitgen_config["pooling_mode"]
-            LEARNING_RATE_HITGEN = hitgen_config["learning_rate"]
-            PATIENCE_HITGEN = hitgen_config["patience"]
-            STRIDE_TEMPORALIZE_HITGEN = 1
-            SHUFFLE_HITGEN = hitgen_config["shuffle"]
-            BI_RNN_HITGEN = hitgen_config["bi_rnn"]
-            ANNEALING_HITGEN = False
-            CONV1D_BLOCKS_BACKCAST_HITGEN = hitgen_config["conv1d_blocks_backcast"]
-            FILTERS_BACKCAST_HITGEN = hitgen_config["filters_backcast"]
-            KERNEL_SIZE_BACKCAST_HITGEN = hitgen_config["kernel_size_backcast"]
-            CONV1D_BLOCKS_FORECAST_HITGEN = hitgen_config["conv1d_blocks_forecast"]
-            FILTERS_FORECAST_HITGEN = hitgen_config["filters_forecast"]
-            KERNEL_SIZE_FORECAST_HITGEN = hitgen_config["kernel_size_forecast"]
 
             # TIMEGAN Configurations
             # timegan_config = dataset_config["timegan"]
@@ -473,34 +428,18 @@ if __name__ == "__main__":
                 dataset_group=DATASET_GROUP,
                 freq=FREQ,
                 window_size=WINDOW_SIZE,
-                batch_size=BATCH_SIZE_HITGEN,
-                shuffle=SHUFFLE_HITGEN,
-                bi_rnn=BI_RNN_HITGEN,
-                noise_scale_init=NOISE_SAMPLE_INIT,
-                kl_weight_init=KL_WEIGHT_INIT,
-                n_blocks_encoder=N_BLOCKS_ENCODER_HITGEN,
-                n_blocks_decoder=N_BLOCKS_DECODER_HITGEN,
-                n_hidden=N_HIDDEN_HITGEN,
-                n_layers=N_LAYERS_HITGENS,
-                patience=PATIENCE_HITGEN,
-                conv1d_blocks_backcast=CONV1D_BLOCKS_BACKCAST_HITGEN,
-                filters_backcast=FILTERS_BACKCAST_HITGEN,
-                kernel_size_backcast=KERNEL_SIZE_BACKCAST_HITGEN,
-                conv1d_blocks_forecast=CONV1D_BLOCKS_FORECAST_HITGEN,
-                filters_forecast=FILTERS_FORECAST_HITGEN,
-                kernel_size_forecast=KERNEL_SIZE_FORECAST_HITGEN,
             )
 
             # hypertuning
-            create_dataset_vae.hyper_tune_and_train()
+            model = create_dataset_vae.hyper_tune_and_train()
 
             # fit
-            model, history, _ = create_dataset_vae.fit(
-                latent_dim=LATENT_DIM_HITGEN,
-                epochs=EPOCHS_HITGEN,
-                patience=PATIENCE_HITGEN,
-                learning_rate=LEARNING_RATE_HITGEN,
-            )
+            # model, history, _ = create_dataset_vae.fit(
+            #     latent_dim=LATENT_DIM_HITGEN,
+            #     epochs=EPOCHS_HITGEN,
+            #     patience=PATIENCE_HITGEN,
+            #     learning_rate=LEARNING_RATE_HITGEN,
+            # )
             # plot_loss(history)
 
             feature_dict = create_dataset_vae._feature_engineering()
@@ -520,8 +459,8 @@ if __name__ == "__main__":
                 original_mask,
                 original_dyn_features,
                 window_size=WINDOW_SIZE,
-                batch_size=BATCH_SIZE_HITGEN,
-                shuffle=SHUFFLE_HITGEN,
+                batch_size=create_dataset_vae.batch_size,
+                shuffle=create_dataset_vae.shuffle,
             )
 
             _, synth_hitgen_test_long, _, _, synth_hitgen_test_long_no_transf, _ = (
