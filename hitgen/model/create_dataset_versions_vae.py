@@ -80,9 +80,8 @@ class CreateTransformedVersionsCVAE:
         conv1d_blocks_forecast=2,
         filters_forecast=64,
         kernel_size_forecast=3,
-        annealing: bool = False,
-        kl_weight_init: float = 0.1,
-        noise_scale_init: float = 0.1,
+        kl_weight_init: float = None,
+        noise_scale_init: float = None,
         n_blocks_encoder: int = 3,
         n_blocks_decoder: int = 3,
         n_hidden: int = 16,
@@ -108,7 +107,6 @@ class CreateTransformedVersionsCVAE:
         self.shuffle = shuffle
         self.bi_rnn = bi_rnn
         self.forecasting = forecasting
-        self.annealing = annealing
         self.kl_weight_init = kl_weight_init
         self.noise_scale_init = noise_scale_init
         self.n_blocks_encoder = n_blocks_encoder
@@ -1072,9 +1070,6 @@ class CreateTransformedVersionsCVAE:
         self,
         cvae: CVAE,
         data_mask_temporalized,
-        samples,
-        window_size,
-        latent_dim,
         train_test_split=0.7,
         train_size_absolute=None,
     ) -> Tuple[
@@ -1142,9 +1137,6 @@ class CreateTransformedVersionsCVAE:
         self,
         cvae: CVAE,
         data_mask_temporalized,
-        samples,
-        window_size,
-        latent_dim,
         train_test_split=0.7,
         train_size_absolute=None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -1183,70 +1175,3 @@ class CreateTransformedVersionsCVAE:
         ]
 
         return X_hat_train_long, X_hat_train_long_no_transf
-
-    @staticmethod
-    def temporalize(tensor_2d, window_size):
-        shape = tf.shape(tensor_2d)
-        output = []
-
-        for idx in range(shape[0] - window_size + 1):
-            window = tensor_2d[idx : idx + window_size, :]
-            output.append(window)
-
-        output = tf.stack(output)
-
-        return output
-
-    @staticmethod
-    def inverse_transform(data, scaler):
-        if not scaler:
-            return data
-        # Reshape from (samples, timesteps, features) to (samples*timesteps, features)
-        original_shape = data.shape
-        data_reshaped = data.reshape(-1, original_shape[-1])
-        data_inverse = scaler.inverse_transform(data_reshaped)
-        return data_inverse.reshape(original_shape)
-
-    def generate_new_datasets(
-        self,
-        cvae: CVAE,
-        z_mean: np.ndarray,
-        z_log_var: np.ndarray,
-        transformation: Optional[str] = None,
-        transf_param: List[float] = None,
-        n_versions: int = 6,
-        n_samples: int = 10,
-        save: bool = True,
-    ) -> np.ndarray:
-        """
-        Generate new datasets using the CVAE trained model and different samples from its latent space.
-
-        Args:
-            cvae: A trained Conditional Variational Autoencoder (CVAE) model.
-            z_mean: Mean parameters of the latent space distribution (Gaussian). Shape: [num_samples, window_size].
-            z_log_var: Log variance parameters of the latent space distribution (Gaussian). Shape: [num_samples, window_size].
-            transformation: Transformation to apply to the data, if any.
-            transf_param: Parameter for the transformation.
-            n_versions: Number of versions of the dataset to create.
-            n_samples: Number of samples of the dataset to create.
-            save: If True, the generated datasets are stored locally.
-
-        Returns:
-            An array containing the new generated datasets.
-        """
-        if transf_param is None:
-            transf_param = [0.5, 2, 4, 10, 20, 50]
-        y_new = np.zeros((n_versions, n_samples, self.n, self.s))
-        s = 0
-        for v in range(1, n_versions + 1):
-            for s in range(1, n_samples + 1):
-                y_new[v - 1, s - 1] = self.generate_transformed_time_series(
-                    cvae=cvae,
-                    z_mean=z_mean,
-                    z_log_var=z_log_var,
-                    transformation=transformation,
-                    transf_param=transf_param[v - 1],
-                )
-            if save:
-                self._save_version_file(y_new[v - 1], v, s, "vae")
-        return y_new
