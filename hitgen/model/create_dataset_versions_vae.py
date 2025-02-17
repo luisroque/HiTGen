@@ -42,28 +42,6 @@ class InvalidFrequencyError(Exception):
 class CreateTransformedVersionsCVAE:
     """
     Class for creating transformed versions of the dataset using a Conditional Variational Autoencoder (CVAE).
-
-    This class contains several methods to preprocess data, fit a CVAE, generate new time series, and
-    save transformed versions of the dataset. It's designed to be used with time-series data.
-
-    The class follows the Singleton design pattern ensuring that only one instance can exist.
-
-    Args:
-        dataset_name: Name of the dataset.
-        freq: Frequency of the time series data.
-        input_dir: Directory where the input data is located. Defaults to "./".
-        transf_data: Type of transformation applied to the data. Defaults to "whole".
-        top: Number of top series to select. Defaults to None.
-        window_size: Window size for the sliding window. Defaults to 10.
-        weekly_m5: If True, use the M5 competition's weekly grouping. Defaults to True.
-        test_size: Size of the test set. If None, the size is determined automatically. Defaults to None.
-
-        Below are parameters for the synthetic data creation:
-            num_base_series_time_points: Number of base time points in the series. Defaults to 100.
-            num_latent_dim: Dimension of the latent space. Defaults to 3.
-            num_variants: Number of variants for the transformation. Defaults to 20.
-            noise_scale: Scale of the Gaussian noise. Defaults to 0.1.
-            amplitude: Amplitude of the time series data. Defaults to 1.0.
     """
 
     _instance = None
@@ -82,20 +60,19 @@ class CreateTransformedVersionsCVAE:
         dataset_group: str,
         freq: str,
         batch_size: int = 8,
-        shuffle: bool = True,
+        shuffle: bool = False,
         input_dir: str = "./assets/",
         transf_data: str = "whole",
         top: int = None,
-        window_size: int = 12,
+        window_size: int = 6,
         weekly_m5: bool = True,
         test_size: int = None,
         num_base_series_time_points: int = 100,
-        num_latent_dim: int = 3,
         num_variants: int = 20,
         noise_scale: float = 0.1,
         amplitude: float = 1.0,
         stride_temporalize: int = 2,
-        bi_rnn: bool = True,
+        bi_rnn: bool = False,
         forecasting: bool = True,
         conv1d_blocks_backcast=2,
         filters_backcast=64,
@@ -103,9 +80,9 @@ class CreateTransformedVersionsCVAE:
         conv1d_blocks_forecast=2,
         filters_forecast=64,
         kernel_size_forecast=3,
-        annealing: bool = True,
-        kl_weight_init: float = None,
-        noise_scale_init: float = None,
+        annealing: bool = False,
+        kl_weight_init: float = 0.1,
+        noise_scale_init: float = 0.1,
         n_blocks_encoder: int = 3,
         n_blocks_decoder: int = 3,
         n_hidden: int = 16,
@@ -123,7 +100,6 @@ class CreateTransformedVersionsCVAE:
         self.test_size = test_size
         self.weekly_m5 = weekly_m5
         self.num_base_series_time_points = num_base_series_time_points
-        self.num_latent_dim = num_latent_dim
         self.num_variants = num_variants
         self.noise_scale = noise_scale
         self.amplitude = amplitude
@@ -205,28 +181,6 @@ class CreateTransformedVersionsCVAE:
         data_long = df.melt(id_vars=["ds"], var_name="unique_id", value_name="y")
 
         return data_long
-
-    def _get_dataset(self):
-        """
-        Get dataset and apply preprocessing
-        """
-        ppc_args = {
-            "dataset": self.dataset_name,
-            "freq": self.freq,
-            "input_dir": self.input_dir,
-            "top": self.top,
-            "test_size": self.test_size,
-            "weekly_m5": self.weekly_m5,
-            "num_base_series_time_points": self.num_base_series_time_points,
-            "num_latent_dim": self.num_latent_dim,
-            "num_variants": self.num_variants,
-            "noise_scale": self.noise_scale,
-            "amplitude": self.amplitude,
-        }
-
-        dataset = ppc(**ppc_args).apply_preprocess()
-
-        return dataset
 
     def _create_directories(self):
         """
@@ -1058,7 +1012,7 @@ class CreateTransformedVersionsCVAE:
         )
 
         encoder, decoder = get_CVAE(
-            window_size=self.best_params["latent_dim"],
+            window_size=self.best_params["window_size"],
             n_series=self.s_train,
             latent_dim=self.best_params["latent_dim"],
             bi_rnn=self.best_params["bi_rnn"],
@@ -1070,6 +1024,12 @@ class CreateTransformedVersionsCVAE:
             kernel_size=self.best_params["kernel_size"],
             pooling_mode=self.best_params["pooling_mode"],
             forecasting=self.best_params["forecasting"],
+            conv1d_blocks_backcast=self.best_params["conv1d_blocks_backcast"],
+            filters_backcast=self.best_params["filters_backcast"],
+            kernel_size_backcast=self.best_params["kernel_size_backcast"],
+            conv1d_blocks_forecast=self.best_params["conv1d_blocks_forecast"],
+            filters_forecast=self.best_params["filters_forecast"],
+            kernel_size_forecast=self.best_params["kernel_size_forecast"],
         )
 
         cvae = CVAE(
@@ -1106,6 +1066,7 @@ class CreateTransformedVersionsCVAE:
             json.dump(history.history, f)
 
         print("Training completed with the best hyperparameters.")
+        return cvae
 
     def predict(
         self,

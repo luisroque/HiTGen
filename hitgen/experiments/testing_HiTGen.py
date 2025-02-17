@@ -19,33 +19,6 @@ from hitgen.benchmarks.metaforecast import workflow_metaforecast_methods
 DATASETS_HYPERPARAMS_CONFIGS = {
     "Tourism": {
         "Monthly": {
-            "hitgen": {
-                "latent_dim": 136,
-                "window_size": 6,
-                "patience": 30,
-                "kl_weight": 0.43050068783865714,
-                "n_blocks_encoder": 2,
-                "n_blocks_decoder": 3,
-                "n_hidden": 48,
-                "n_layers": 5,
-                "kernel_size": 2,
-                "pooling_mode": "average",
-                "batch_size": 16,
-                "epochs": 400,
-                "learning_rate": 2.928465251011121e-05,
-                "bi_rnn": False,
-                "shuffle": False,
-                "forecasting": True,
-                "conv1d_blocks_backcast": 4,
-                "filters_backcast": 112,
-                "kernel_size_backcast": 2,
-                "conv1d_blocks_forecast": 1,
-                "filters_forecast": 48,
-                "kernel_size_forecast": 3,
-                "noise_scale_init": 0.09539530812184871,
-                "loss": 0.06484322994947433,
-                "score": 0.7752525252525252,
-            },
             # "timegan": {
             #     "gan_args": ModelParameters(
             #         batch_size=16,
@@ -65,26 +38,6 @@ DATASETS_HYPERPARAMS_CONFIGS = {
     },
     "M1": {
         "Monthly": {
-            "hitgen": {
-                "latent_dim": 160,
-                "window_size": 6,
-                "patience": 30,
-                "kl_weight": 0.2610795530454687,
-                "n_blocks_encoder": 5,
-                "n_blocks_decoder": 3,
-                "n_hidden": 80,
-                "n_layers": 4,
-                "kernel_size": 3,
-                "pooling_mode": "average",
-                "batch_size": 32,
-                "epochs": 201,
-                "learning_rate": 6.793270451373548e-05,
-                "bi_rnn": False,
-                "shuffle": False,
-                "noise_scale_init": 0.10154533259405613,
-                "loss": 0.021175503730773926,
-                "score": 0.721407624633431,
-            },
             # "timegan": {
             #     "gan_args": ModelParameters(
             #         batch_size=16,
@@ -102,26 +55,6 @@ DATASETS_HYPERPARAMS_CONFIGS = {
             # },
         },
         "Quarterly": {
-            "hitgen": {
-                "latent_dim": 272,
-                "window_size": 6,
-                "patience": 35,
-                "kl_weight": 0.17777770949878585,
-                "n_blocks_encoder": 2,
-                "n_blocks_decoder": 2,
-                "n_hidden": 64,
-                "n_layers": 2,
-                "kernel_size": 4,
-                "pooling_mode": "average",
-                "batch_size": 4,
-                "epochs": 1001,
-                "learning_rate": 1.2680755394089549e-05,
-                "bi_rnn": False,
-                "shuffle": False,
-                "noise_scale_init": 0.21923453053431197,
-                "loss": 0.01676071435213089,
-                "score": 0.8552188552188552,
-            },
             # "timegan": {
             #     "gan_args": ModelParameters(
             #         batch_size=16,
@@ -141,24 +74,6 @@ DATASETS_HYPERPARAMS_CONFIGS = {
     },
     "M3": {
         "Monthly": {
-            "hitgen": {
-                "latent_dim": 300,
-                "window_size": 6,
-                "patience": 30,
-                "kl_weight": 0.1,
-                "n_blocks_encoder": 3,
-                "n_blocks_decoder": 3,
-                "n_hidden": 16,
-                "n_layers": 2,
-                "kernel_size": 2,
-                "pooling_mode": "average",
-                "batch_size": 8,
-                "epochs": 1000,
-                "learning_rate": 0.001,
-                "bi_rnn": True,
-                "shuffle": True,
-                "noise_scale_init": 0.1,
-            },
             # "timegan": {
             #     "gan_args": ModelParameters(
             #         batch_size=16,
@@ -176,26 +91,6 @@ DATASETS_HYPERPARAMS_CONFIGS = {
             # },
         },
         "Quarterly": {
-            "hitgen": {
-                "latent_dim": 64,
-                "window_size": 6,
-                "patience": 40,
-                "kl_weight": 0.29284993768790907,
-                "n_blocks_encoder": 1,
-                "n_blocks_decoder": 3,
-                "n_hidden": 48,
-                "n_layers": 3,
-                "kernel_size": 4,
-                "pooling_mode": "max",
-                "batch_size": 32,
-                "epochs": 401,
-                "learning_rate": 0.0002987122732991142,
-                "bi_rnn": False,
-                "shuffle": False,
-                "noise_scale_init": 0.4905517592788796,
-                "loss": 0.06204835698008537,
-                "score": 0.7087813620071683,
-            },
             # "timegan": {
             #     "gan_args": ModelParameters(
             #         batch_size=16,
@@ -213,26 +108,6 @@ DATASETS_HYPERPARAMS_CONFIGS = {
             # },
         },
         "Yearly": {
-            "hitgen": {
-                "latent_dim": 104,
-                "window_size": 6,
-                "patience": 35,
-                "kl_weight": 0.28789251618319167,
-                "n_blocks_encoder": 2,
-                "n_blocks_decoder": 4,
-                "n_hidden": 48,
-                "n_layers": 4,
-                "kernel_size": 3,
-                "pooling_mode": "max",
-                "batch_size": 8,
-                "epochs": 1501,
-                "learning_rate": 1.1220861876134254e-05,
-                "bi_rnn": False,
-                "shuffle": True,
-                "noise_scale_init": 0.19301784561325513,
-                "loss": 0.014789092354476452,
-                "score": 0.7954816987075052,
-            },
             # "timegan": {
             #     "gan_args": ModelParameters(
             #         batch_size=16,
@@ -252,24 +127,6 @@ DATASETS_HYPERPARAMS_CONFIGS = {
     },
     "M4": {
         "Monthly": {
-            "hitgen": {
-                "latent_dim": 150,
-                "window_size": 6,
-                "patience": 30,
-                "kl_weight": 0.1,
-                "n_blocks_encoder": 3,
-                "n_blocks_decoder": 3,
-                "n_hidden": 16,
-                "n_layers": 2,
-                "kernel_size": 2,
-                "pooling_mode": "average",
-                "batch_size": 8,
-                "epochs": 1000,
-                "learning_rate": 0.001,
-                "bi_rnn": True,
-                "shuffle": True,
-                "noise_scale_init": 0.1,
-            },
             # "timegan": {
             #     "gan_args": ModelParameters(
             #         batch_size=16,
@@ -287,24 +144,6 @@ DATASETS_HYPERPARAMS_CONFIGS = {
             # },
         },
         "Quarterly": {
-            "hitgen": {
-                "latent_dim": 150,
-                "window_size": 6,
-                "patience": 30,
-                "kl_weight": 0.1,
-                "n_blocks_encoder": 3,
-                "n_blocks_decoder": 3,
-                "n_hidden": 16,
-                "n_layers": 2,
-                "kernel_size": 2,
-                "pooling_mode": "average",
-                "batch_size": 8,
-                "epochs": 1000,
-                "learning_rate": 0.001,
-                "bi_rnn": True,
-                "shuffle": True,
-                "noise_scale_init": 0.1,
-            },
             # "timegan": {
             #     "gan_args": ModelParameters(
             #         batch_size=16,
@@ -430,31 +269,8 @@ if __name__ == "__main__":
             VAL_STEPS = 0
 
             # HITGEN Configurations
-            hitgen_config = dataset_config["hitgen"]
-            WINDOW_SIZE = hitgen_config["window_size"]
-            LATENT_DIM_HITGEN = hitgen_config["latent_dim"]
-            EPOCHS_HITGEN = hitgen_config["epochs"]
-            BATCH_SIZE_HITGEN = hitgen_config["batch_size"]
-            KL_WEIGHT_INIT = hitgen_config["kl_weight"]
-            NOISE_SAMPLE_INIT = hitgen_config["noise_scale_init"]
-            N_BLOCKS_ENCODER_HITGEN = hitgen_config["n_blocks_encoder"]
-            N_BLOCKS_DECODER_HITGEN = hitgen_config["n_blocks_decoder"]
-            N_HIDDEN_HITGEN = hitgen_config["n_hidden"]
-            N_LAYERS_HITGENS = hitgen_config["n_layers"]
-            KERNEL_SIZE_HITGEN = hitgen_config["kernel_size"]
-            POOLING_MODE_HITGEN = hitgen_config["pooling_mode"]
-            LEARNING_RATE_HITGEN = hitgen_config["learning_rate"]
-            PATIENCE_HITGEN = hitgen_config["patience"]
-            STRIDE_TEMPORALIZE_HITGEN = 1
-            SHUFFLE_HITGEN = hitgen_config["shuffle"]
-            BI_RNN_HITGEN = hitgen_config["bi_rnn"]
-            ANNEALING_HITGEN = False
-            CONV1D_BLOCKS_BACKCAST_HITGEN = hitgen_config["conv1d_blocks_backcast"]
-            FILTERS_BACKCAST_HITGEN = hitgen_config["filters_backcast"]
-            KERNEL_SIZE_BACKCAST_HITGEN = hitgen_config["kernel_size_backcast"]
-            CONV1D_BLOCKS_FORECAST_HITGEN = hitgen_config["conv1d_blocks_forecast"]
-            FILTERS_FORECAST_HITGEN = hitgen_config["filters_forecast"]
-            KERNEL_SIZE_FORECAST_HITGEN = hitgen_config["kernel_size_forecast"]
+            # hitgen_config = dataset_config["hitgen"]
+            WINDOW_SIZE = 6
 
             # TIMEGAN Configurations
             # timegan_config = dataset_config["timegan"]
@@ -474,36 +290,18 @@ if __name__ == "__main__":
                 freq=FREQ,
                 top=TOP,
                 window_size=WINDOW_SIZE,
-                stride_temporalize=STRIDE_TEMPORALIZE_HITGEN,
-                batch_size=BATCH_SIZE_HITGEN,
-                shuffle=SHUFFLE_HITGEN,
-                bi_rnn=BI_RNN_HITGEN,
-                annealing=ANNEALING_HITGEN,
-                noise_scale_init=NOISE_SAMPLE_INIT,
-                kl_weight_init=KL_WEIGHT_INIT,
-                n_blocks_encoder=N_BLOCKS_ENCODER_HITGEN,
-                n_blocks_decoder=N_BLOCKS_DECODER_HITGEN,
-                n_hidden=N_HIDDEN_HITGEN,
-                n_layers=N_LAYERS_HITGENS,
-                patience=PATIENCE_HITGEN,
-                conv1d_blocks_backcast=CONV1D_BLOCKS_BACKCAST_HITGEN,
-                filters_backcast=FILTERS_BACKCAST_HITGEN,
-                kernel_size_backcast=KERNEL_SIZE_BACKCAST_HITGEN,
-                conv1d_blocks_forecast=CONV1D_BLOCKS_FORECAST_HITGEN,
-                filters_forecast=FILTERS_FORECAST_HITGEN,
-                kernel_size_forecast=KERNEL_SIZE_FORECAST_HITGEN,
             )
 
             # hypertuning
-            create_dataset_vae.hyper_tune_and_train()
+            model = create_dataset_vae.hyper_tune_and_train()
 
             # fit
-            model, history, _ = create_dataset_vae.fit(
-                latent_dim=LATENT_DIM_HITGEN,
-                epochs=EPOCHS_HITGEN,
-                patience=PATIENCE_HITGEN,
-                learning_rate=LEARNING_RATE_HITGEN,
-            )
+            # model, history, _ = create_dataset_vae.fit(
+            #     latent_dim=LATENT_DIM_HITGEN,
+            #     epochs=EPOCHS_HITGEN,
+            #     patience=PATIENCE_HITGEN,
+            #     learning_rate=LEARNING_RATE_HITGEN,
+            # )
             # plot_loss(history)
 
             feature_dict = create_dataset_vae._feature_engineering()
