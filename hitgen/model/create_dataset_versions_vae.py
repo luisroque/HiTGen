@@ -928,7 +928,6 @@ class CreateTransformedVersionsCVAE:
         del cvae, encoder, decoder
         tf.keras.backend.clear_session()
         gc.collect()
-        os.system("nvidia-smi --gpu-reset")
 
         return score
 
