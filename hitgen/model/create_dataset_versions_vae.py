@@ -772,7 +772,7 @@ class CreateTransformedVersionsCVAE:
         """
         # try:
         latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
-        window_size = trial.suggest_int("window_size", 6, 24)
+        window_size = trial.suggest_int("window_size", 4, 24)
         patience = trial.suggest_int("patience", 20, 40, step=5)
         kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
         n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
