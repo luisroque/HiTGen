@@ -1012,7 +1012,7 @@ class CreateTransformedVersionsCVAE:
         )
 
         encoder, decoder = get_CVAE(
-            window_size=self.best_params["window_size"],
+            window_size=self.window_size,
             n_series=self.s_train,
             latent_dim=self.best_params["latent_dim"],
             bi_rnn=self.best_params["bi_rnn"],
