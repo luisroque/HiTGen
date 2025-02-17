@@ -897,9 +897,6 @@ class CreateTransformedVersionsCVAE:
         _, synthetic_data_long_no_transf = self.predict_train(
             cvae,
             data_mask_temporalized=data_mask_temporalized,
-            samples=data_mask_temporalized.indices.shape[0],
-            window_size=self.window_size,
-            latent_dim=latent_dim,
         )
 
         # compute the discriminative score x times to account for variability
