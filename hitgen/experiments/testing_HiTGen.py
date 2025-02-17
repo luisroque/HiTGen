@@ -329,9 +329,6 @@ if __name__ == "__main__":
                 create_dataset_vae.predict(
                     model,
                     data_mask_temporalized=data_mask_temporalized,
-                    samples=data_mask_temporalized.indices.shape[0],
-                    window_size=create_dataset_vae.best_params["window_size"],
-                    latent_dim=create_dataset_vae.best_params["latent_dim"],
                 )
             )
 
