@@ -622,7 +622,8 @@ class CreateTransformedVersionsCVAE:
         )
         cvae.compile(
             optimizer=keras.optimizers.Adam(
-                learning_rate=learning_rate, clipnorm=1.0, clipvalue=1.0
+                learning_rate=learning_rate,
+                clipnorm=1.0,
             ),
             metrics=[cvae.reconstruction_loss_tracker, cvae.kl_loss_tracker],
         )
