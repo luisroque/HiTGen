@@ -236,7 +236,7 @@ class CVAE(keras.Model):
         self,
         encoder: keras.Model,
         decoder: keras.Model,
-        kl_weight_initial: int = None,
+        kl_weight_initial: float = None,
         forecasting: bool = True,
         **kwargs,
     ) -> None:

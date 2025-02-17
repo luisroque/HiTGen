@@ -1005,7 +1005,7 @@ class CreateTransformedVersionsCVAE:
             data_train,
             mask_train,
             dyn_features_train,
-            window_size=self.best_params["latent_dim"],
+            window_size=self.window_size,
             stride=self.stride_temporalize,
             batch_size=self.best_params["batch_size"],
             shuffle=self.best_params["shuffle"],
