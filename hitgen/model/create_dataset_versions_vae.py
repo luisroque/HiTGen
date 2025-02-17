@@ -2,10 +2,9 @@ import os
 import gc
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from typing import Optional, List, Tuple, Dict
 import json
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import optuna
 from tensorflow import keras
 import tensorflow as tf
@@ -16,20 +15,16 @@ from tensorflow import (
 )
 from hitgen.model.models import (
     CVAE,
-    KLAnnealingAndNoiseScalingCallback,
     TemporalizeGenerator,
 )
 from hitgen.feature_engineering.feature_transformations import (
     detemporalize,
 )
-from hitgen.preprocessing.pre_processing_datasets import (
-    PreprocessDatasets as ppc,
-)
 from hitgen.model.models import get_CVAE
 from hitgen.metrics.discriminative_score import (
     compute_discriminative_score,
 )
-from hitgen.load_data.config import DATASETS, DATASETS_FREQ
+from hitgen.load_data.config import DATASETS
 from hitgen.visualization.model_visualization import (
     plot_generated_vs_original,
 )
@@ -61,7 +56,6 @@ class CreateTransformedVersionsCVAE:
         freq: str,
         batch_size: int = 8,
         shuffle: bool = False,
-        window_size: int = 6,
         noise_scale: float = 0.1,
         amplitude: float = 1.0,
         bi_rnn: bool = False,
@@ -110,8 +104,6 @@ class CreateTransformedVersionsCVAE:
             self.dataset_name, self.dataset_group
         )
         self.s_train = None
-        if window_size:
-            self.window_size = window_size
         self.y = self.data
         self.n = self.data.shape[0]
         self.df = pd.DataFrame(self.data)
@@ -139,10 +131,7 @@ class CreateTransformedVersionsCVAE:
         except FileNotFoundError as e:
             print(f"Error loading data for {dataset_name} - {group}: {e}")
 
-        h = data_cls.horizons_map[group]
-        n_lags = data_cls.context_length[group]
         freq = data_cls.frequency_pd[group]
-        season_len = data_cls.frequency_map[group]
         n_series = int(ds.nunique()["unique_id"])
         return ds, n_series, freq
 
@@ -479,24 +468,9 @@ class CreateTransformedVersionsCVAE:
             "fourier_features_original": fourier_features_original,
         }
 
-    @staticmethod
-    def _generate_noise(self, n_batches, window_size):
-        while True:
-            yield np.random.uniform(low=0, high=1, size=(n_batches, window_size))
-
-    def get_batch_noise(
-        self,
-        batch_size,
-        size=None,
-    ):
-        return iter(
-            tfdata.Dataset.from_generator(self._generate_noise, output_types=float32)
-            .batch(batch_size if size is None else size)
-            .repeat()
-        )
-
     def fit(
         self,
+        window_size: int,
         epochs: int = 750,
         patience: int = 30,
         latent_dim: int = 32,
@@ -515,13 +489,13 @@ class CreateTransformedVersionsCVAE:
             original_data,
             original_mask,
             original_features,
-            window_size=self.window_size,
+            window_size=window_size,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
         )
 
         encoder, decoder = get_CVAE(
-            window_size=self.window_size,
+            window_size=window_size,
             n_series=self.s,
             latent_dim=latent_dim,
             bi_rnn=self.bi_rnn,
@@ -761,7 +735,7 @@ class CreateTransformedVersionsCVAE:
         """
         # try:
         latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
-        # window_size = trial.suggest_int("window_size", 6, 24)
+        window_size = trial.suggest_int("window_size", 4, 8)
         patience = trial.suggest_int("patience", 20, 40, step=5)
         kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
         n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
@@ -805,13 +779,13 @@ class CreateTransformedVersionsCVAE:
             train_data,
             train_mask,
             train_dyn_features,
-            window_size=self.window_size,
+            window_size=window_size,
             batch_size=batch_size,
             shuffle=shuffle,
         )
 
         encoder, decoder = get_CVAE(
-            window_size=self.window_size,
+            window_size=window_size,
             n_series=self.s_train,
             latent_dim=latent_dim,
             bi_rnn=bi_rnn,
@@ -887,7 +861,7 @@ class CreateTransformedVersionsCVAE:
             synthetic_data_long_no_transf,
             score,
             latent_dim,
-            self.window_size,
+            window_size,
             patience,
             kl_weight,
             n_blocks_encoder,
@@ -916,7 +890,6 @@ class CreateTransformedVersionsCVAE:
         del cvae, encoder, decoder
         tf.keras.backend.clear_session()
         gc.collect()
-        os.system("nvidia-smi --gpu-reset")
 
         return score
 
@@ -974,13 +947,13 @@ class CreateTransformedVersionsCVAE:
             data_train,
             mask_train,
             dyn_features_train,
-            window_size=self.best_params["latent_dim"],
+            window_size=self.best_params["window_size"],
             batch_size=self.best_params["batch_size"],
             shuffle=self.best_params["shuffle"],
         )
 
         encoder, decoder = get_CVAE(
-            window_size=self.best_params["latent_dim"],
+            window_size=self.best_params["window_size"],
             n_series=self.s_train,
             latent_dim=self.best_params["latent_dim"],
             bi_rnn=self.best_params["bi_rnn"],
@@ -1138,70 +1111,3 @@ class CreateTransformedVersionsCVAE:
         ]
 
         return X_hat_train_long, X_hat_train_long_no_transf
-
-    @staticmethod
-    def temporalize(tensor_2d, window_size):
-        shape = tf.shape(tensor_2d)
-        output = []
-
-        for idx in range(shape[0] - window_size + 1):
-            window = tensor_2d[idx : idx + window_size, :]
-            output.append(window)
-
-        output = tf.stack(output)
-
-        return output
-
-    @staticmethod
-    def inverse_transform(data, scaler):
-        if not scaler:
-            return data
-        # Reshape from (samples, timesteps, features) to (samples*timesteps, features)
-        original_shape = data.shape
-        data_reshaped = data.reshape(-1, original_shape[-1])
-        data_inverse = scaler.inverse_transform(data_reshaped)
-        return data_inverse.reshape(original_shape)
-
-    def generate_new_datasets(
-        self,
-        cvae: CVAE,
-        z_mean: np.ndarray,
-        z_log_var: np.ndarray,
-        transformation: Optional[str] = None,
-        transf_param: List[float] = None,
-        n_versions: int = 6,
-        n_samples: int = 10,
-        save: bool = True,
-    ) -> np.ndarray:
-        """
-        Generate new datasets using the CVAE trained model and different samples from its latent space.
-
-        Args:
-            cvae: A trained Conditional Variational Autoencoder (CVAE) model.
-            z_mean: Mean parameters of the latent space distribution (Gaussian). Shape: [num_samples, window_size].
-            z_log_var: Log variance parameters of the latent space distribution (Gaussian). Shape: [num_samples, window_size].
-            transformation: Transformation to apply to the data, if any.
-            transf_param: Parameter for the transformation.
-            n_versions: Number of versions of the dataset to create.
-            n_samples: Number of samples of the dataset to create.
-            save: If True, the generated datasets are stored locally.
-
-        Returns:
-            An array containing the new generated datasets.
-        """
-        if transf_param is None:
-            transf_param = [0.5, 2, 4, 10, 20, 50]
-        y_new = np.zeros((n_versions, n_samples, self.n, self.s))
-        s = 0
-        for v in range(1, n_versions + 1):
-            for s in range(1, n_samples + 1):
-                y_new[v - 1, s - 1] = self.generate_transformed_time_series(
-                    cvae=cvae,
-                    z_mean=z_mean,
-                    z_log_var=z_log_var,
-                    transformation=transformation,
-                    transf_param=transf_param[v - 1],
-                )
-            if save:
-                self._save_version_file(y_new[v - 1], v, s, "vae")
-        return y_new

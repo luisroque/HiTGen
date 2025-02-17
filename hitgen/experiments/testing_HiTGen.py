@@ -407,10 +407,6 @@ if __name__ == "__main__":
             TOP = None
             VAL_STEPS = 0
 
-            # HITGEN Configurations
-            hitgen_config = dataset_config["hitgen"]
-            WINDOW_SIZE = hitgen_config["window_size"]
-
             # TIMEGAN Configurations
             # timegan_config = dataset_config["timegan"]
             # gan_args = timegan_config["gan_args"]
@@ -427,7 +423,6 @@ if __name__ == "__main__":
                 dataset_name=DATASET,
                 dataset_group=DATASET_GROUP,
                 freq=FREQ,
-                window_size=WINDOW_SIZE,
             )
 
             # hypertuning
@@ -458,9 +453,9 @@ if __name__ == "__main__":
                 original_data,
                 original_mask,
                 original_dyn_features,
-                window_size=WINDOW_SIZE,
-                batch_size=create_dataset_vae.batch_size,
-                shuffle=create_dataset_vae.shuffle,
+                window_size=create_dataset_vae.best_params["window_size"],
+                batch_size=create_dataset_vae.best_params["batch_size"],
+                shuffle=create_dataset_vae.best_params["shuffle"],
             )
 
             _, synth_hitgen_test_long, _, _, synth_hitgen_test_long_no_transf, _ = (
