@@ -128,8 +128,7 @@ class CreateTransformedVersionsCVAE:
             self.dataset_name, self.dataset_group
         )
         self.s_train = None
-        if window_size:
-            self.window_size = window_size
+        self.window_size = window_size
         self.y = self.data
         self.n = self.data.shape[0]
         self.df = pd.DataFrame(self.data)
@@ -505,25 +504,10 @@ class CreateTransformedVersionsCVAE:
             "fourier_features_original": fourier_features_original,
         }
 
-    @staticmethod
-    def _generate_noise(self, n_batches, window_size):
-        while True:
-            yield np.random.uniform(low=0, high=1, size=(n_batches, window_size))
-
-    def get_batch_noise(
-        self,
-        batch_size,
-        size=None,
-    ):
-        return iter(
-            tfdata.Dataset.from_generator(self._generate_noise, output_types=float32)
-            .batch(batch_size if size is None else size)
-            .repeat()
-        )
-
     def fit(
         self,
         epochs: int = 750,
+        window_size: int = 6,
         patience: int = 30,
         latent_dim: int = 32,
         learning_rate: float = 0.001,
@@ -541,14 +525,14 @@ class CreateTransformedVersionsCVAE:
             original_data,
             original_mask,
             original_features,
-            window_size=self.window_size,
+            window_size=window_size,
             stride=self.stride_temporalize,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
         )
 
         encoder, decoder = get_CVAE(
-            window_size=self.window_size,
+            window_size=window_size,
             n_series=self.s,
             latent_dim=latent_dim,
             bi_rnn=self.bi_rnn,
@@ -788,7 +772,7 @@ class CreateTransformedVersionsCVAE:
         """
         # try:
         latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
-        # window_size = trial.suggest_int("window_size", 6, 24)
+        window_size = trial.suggest_int("window_size", 6, 24)
         patience = trial.suggest_int("patience", 20, 40, step=5)
         kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
         n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
@@ -832,14 +816,14 @@ class CreateTransformedVersionsCVAE:
             train_data,
             train_mask,
             train_dyn_features,
-            window_size=self.window_size,
+            window_size=window_size,
             stride=self.stride_temporalize,
             batch_size=batch_size,
             shuffle=shuffle,
         )
 
         encoder, decoder = get_CVAE(
-            window_size=self.window_size,
+            window_size=window_size,
             n_series=self.s_train,
             latent_dim=latent_dim,
             bi_rnn=bi_rnn,
@@ -887,9 +871,6 @@ class CreateTransformedVersionsCVAE:
         _, synthetic_data_long_no_transf = self.predict_train(
             cvae,
             data_mask_temporalized=data_mask_temporalized,
-            samples=data_mask_temporalized.indices.shape[0],
-            window_size=self.window_size,
-            latent_dim=latent_dim,
         )
 
         # compute the discriminative score x times to account for variability
@@ -914,33 +895,33 @@ class CreateTransformedVersionsCVAE:
             raise optuna.exceptions.TrialPruned()
 
         self.update_best_scores(
-            original_data_train_no_transf_long,
-            synthetic_data_long_no_transf,
-            score,
-            latent_dim,
-            self.window_size,
-            patience,
-            kl_weight,
-            n_blocks_encoder,
-            n_blocks_decoder,
-            n_hidden,
-            n_layers,
-            kernel_size,
-            pooling_mode,
-            batch_size,
-            epochs,
-            learning_rate,
-            bi_rnn,
-            shuffle,
-            forecasting,
-            conv1d_blocks_backcast,
-            filters_backcast,
-            kernel_size_backcast,
-            conv1d_blocks_forecast,
-            filters_forecast,
-            kernel_size_forecast,
-            noise_scale_init,
-            loss,
+            original_data=original_data_train_no_transf_long,
+            synthetic_data=synthetic_data_long_no_transf,
+            score=score,
+            latent_dim=latent_dim,
+            window_size=window_size,
+            patience=patience,
+            kl_weight=kl_weight,
+            n_blocks_encoder=n_blocks_encoder,
+            n_blocks_decoder=n_blocks_decoder,
+            n_hidden=n_hidden,
+            n_layers=n_layers,
+            kernel_size=kernel_size,
+            pooling_mode=pooling_mode,
+            batch_size=batch_size,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            bi_rnn=bi_rnn,
+            shuffle=shuffle,
+            forecasting=forecasting,
+            conv1d_blocks_backcast=conv1d_blocks_backcast,
+            filters_backcast=filters_backcast,
+            kernel_size_backcast=kernel_size_backcast,
+            conv1d_blocks_forecast=conv1d_blocks_forecast,
+            filters_forecast=filters_forecast,
+            kernel_size_forecast=kernel_size_forecast,
+            noise_scale_init=noise_scale_init,
+            loss=loss,
         )
 
         # clean GPU memory between trials
@@ -1005,14 +986,14 @@ class CreateTransformedVersionsCVAE:
             data_train,
             mask_train,
             dyn_features_train,
-            window_size=self.window_size,
+            window_size=self.best_params["window_size"],
             stride=self.stride_temporalize,
             batch_size=self.best_params["batch_size"],
             shuffle=self.best_params["shuffle"],
         )
 
         encoder, decoder = get_CVAE(
-            window_size=self.window_size,
+            window_size=self.best_params["window_size"],
             n_series=self.s_train,
             latent_dim=self.best_params["latent_dim"],
             bi_rnn=self.best_params["bi_rnn"],
@@ -1072,9 +1053,6 @@ class CreateTransformedVersionsCVAE:
         self,
         cvae: CVAE,
         data_mask_temporalized,
-        samples,
-        window_size,
-        latent_dim,
         train_test_split=0.7,
         train_size_absolute=None,
     ) -> Tuple[
@@ -1142,9 +1120,6 @@ class CreateTransformedVersionsCVAE:
         self,
         cvae: CVAE,
         data_mask_temporalized,
-        samples,
-        window_size,
-        latent_dim,
         train_test_split=0.7,
         train_size_absolute=None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -1183,70 +1158,3 @@ class CreateTransformedVersionsCVAE:
         ]
 
         return X_hat_train_long, X_hat_train_long_no_transf
-
-    @staticmethod
-    def temporalize(tensor_2d, window_size):
-        shape = tf.shape(tensor_2d)
-        output = []
-
-        for idx in range(shape[0] - window_size + 1):
-            window = tensor_2d[idx : idx + window_size, :]
-            output.append(window)
-
-        output = tf.stack(output)
-
-        return output
-
-    @staticmethod
-    def inverse_transform(data, scaler):
-        if not scaler:
-            return data
-        # Reshape from (samples, timesteps, features) to (samples*timesteps, features)
-        original_shape = data.shape
-        data_reshaped = data.reshape(-1, original_shape[-1])
-        data_inverse = scaler.inverse_transform(data_reshaped)
-        return data_inverse.reshape(original_shape)
-
-    def generate_new_datasets(
-        self,
-        cvae: CVAE,
-        z_mean: np.ndarray,
-        z_log_var: np.ndarray,
-        transformation: Optional[str] = None,
-        transf_param: List[float] = None,
-        n_versions: int = 6,
-        n_samples: int = 10,
-        save: bool = True,
-    ) -> np.ndarray:
-        """
-        Generate new datasets using the CVAE trained model and different samples from its latent space.
-
-        Args:
-            cvae: A trained Conditional Variational Autoencoder (CVAE) model.
-            z_mean: Mean parameters of the latent space distribution (Gaussian). Shape: [num_samples, window_size].
-            z_log_var: Log variance parameters of the latent space distribution (Gaussian). Shape: [num_samples, window_size].
-            transformation: Transformation to apply to the data, if any.
-            transf_param: Parameter for the transformation.
-            n_versions: Number of versions of the dataset to create.
-            n_samples: Number of samples of the dataset to create.
-            save: If True, the generated datasets are stored locally.
-
-        Returns:
-            An array containing the new generated datasets.
-        """
-        if transf_param is None:
-            transf_param = [0.5, 2, 4, 10, 20, 50]
-        y_new = np.zeros((n_versions, n_samples, self.n, self.s))
-        s = 0
-        for v in range(1, n_versions + 1):
-            for s in range(1, n_samples + 1):
-                y_new[v - 1, s - 1] = self.generate_transformed_time_series(
-                    cvae=cvae,
-                    z_mean=z_mean,
-                    z_log_var=z_log_var,
-                    transformation=transformation,
-                    transf_param=transf_param[v - 1],
-                )
-            if save:
-                self._save_version_file(y_new[v - 1], v, s, "vae")
-        return y_new

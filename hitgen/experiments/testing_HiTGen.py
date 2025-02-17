@@ -320,10 +320,9 @@ if __name__ == "__main__":
                 original_data,
                 original_mask,
                 original_dyn_features,
-                window_size=WINDOW_SIZE,
-                stride=create_dataset_vae.stride_temporalize,
-                batch_size=BATCH_SIZE_HITGEN,
-                shuffle=SHUFFLE_HITGEN,
+                window_size=create_dataset_vae.best_params["window_size"],
+                batch_size=create_dataset_vae.best_params["batch_size"],
+                shuffle=create_dataset_vae.best_params["shuffle"],
             )
 
             _, synth_hitgen_test_long, _, _, synth_hitgen_test_long_no_transf, _ = (
@@ -331,8 +330,8 @@ if __name__ == "__main__":
                     model,
                     data_mask_temporalized=data_mask_temporalized,
                     samples=data_mask_temporalized.indices.shape[0],
-                    window_size=WINDOW_SIZE,
-                    latent_dim=LATENT_DIM_HITGEN,
+                    window_size=create_dataset_vae.best_params["window_size"],
+                    latent_dim=create_dataset_vae.best_params["latent_dim"],
                 )
             )
 
