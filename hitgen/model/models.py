@@ -1,13 +1,14 @@
+import logging
 import os
+from typing import List, Tuple, Union
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 from keras import layers
 import tensorflow as tf
 from tensorflow.keras import utils
 from keras import regularizers
-
-
 from tensorflow import keras
 
 K = keras.backend
@@ -406,12 +407,12 @@ def get_CVAE(
     n_hidden: int = 64,
     n_layers: int = 2,
     kernel_size: int = 2,
-    conv1d_blocks_backcast=2,
-    filters_backcast=64,
-    kernel_size_backcast=3,
-    conv1d_blocks_forecast=2,
-    filters_forecast=64,
-    kernel_size_forecast=3,
+    conv1d_blocks_backcast: int = 2,
+    filters_backcast: int = 64,
+    kernel_size_backcast: int = 3,
+    conv1d_blocks_forecast: int = 2,
+    filters_forecast: int = 64,
+    kernel_size_forecast: int = 3,
     pooling_mode: str = "max",
     forecasting: bool = True,
 ) -> tuple[tf.keras.Model, tf.keras.Model]:
@@ -631,22 +632,22 @@ def encoder(
 
 
 def decoder(
-    output_shape,
-    output_shape_dyn_features,
-    latent_dim,
-    n_blocks=3,
-    n_hidden=64,
-    n_layers=2,
-    kernel_size=2,
-    conv1d_blocks_backcast=2,
-    filters_backcast=64,
-    kernel_size_backcast=3,
-    conv1d_blocks_forecast=2,
-    filters_forecast=64,
-    kernel_size_forecast=3,
-    pooling_mode="max",
-    bi_rnn=True,
-    forecasting=True,
+    output_shape: Tuple[int, int],
+    output_shape_dyn_features: Tuple[int, int],
+    latent_dim: int,
+    n_blocks: int = 3,
+    n_hidden: int = 64,
+    n_layers: int = 2,
+    kernel_size: int = 2,
+    conv1d_blocks_backcast: int = 2,
+    filters_backcast: int = 64,
+    kernel_size_backcast: int = 3,
+    conv1d_blocks_forecast: int = 2,
+    filters_forecast: int = 64,
+    kernel_size_forecast: int = 3,
+    pooling_mode: str = "max",
+    bi_rnn: bool = True,
+    forecasting: bool = True,
 ):
     relu_saturation = ReLULinearSaturationLayer()
 

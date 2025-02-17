@@ -854,8 +854,8 @@ class CreateTransformedVersionsCVAE:
         )
         filters_backcast = trial.suggest_int("filters_backcast", 16, 256, step=16)
         kernel_size_backcast = trial.suggest_int("kernel_size_backcast", 2, 4, step=1)
-        conv1d_blocks_forecast = (
-            trial.suggest_int("conv1d_blocks_forecast", 1, 5, step=1),
+        conv1d_blocks_forecast = trial.suggest_int(
+            "conv1d_blocks_forecast", 1, 5, step=1
         )
         filters_forecast = trial.suggest_int("filters_forecast", 16, 256, step=16)
         kernel_size_forecast = trial.suggest_int("kernel_size_forecast", 2, 4, step=1)
