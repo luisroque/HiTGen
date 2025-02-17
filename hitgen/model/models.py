@@ -548,16 +548,16 @@ class MRHIBlock_backcast_forecast(tf.keras.layers.Layer):
 
 
 def encoder(
-    input_shape,
-    input_shape_dyn_features,
-    latent_dim,
-    n_blocks=3,
-    n_hidden=64,
-    n_layers=2,
-    kernel_size=2,
-    pooling_mode="max",
-    bi_rnn=True,
-    noise_scale_init=0.01,
+    input_shape: Tuple[int, int],
+    input_shape_dyn_features: Tuple[int, int],
+    latent_dim: int,
+    n_blocks: int = 3,
+    n_hidden: int = 64,
+    n_layers: int = 2,
+    kernel_size: int = 2,
+    pooling_mode: str = "max",
+    bi_rnn: bool = True,
+    noise_scale_init: float = 0.01,
 ):
     main_input = layers.Input(shape=input_shape, name="main_input")
     mask_input = layers.Input(shape=input_shape, name="mask_input")
@@ -568,7 +568,6 @@ def encoder(
     masked_input = layers.Multiply(name="masked_input")([main_input, mask_input])
     masked_input = layers.Concatenate()([dyn_features_input, masked_input])
 
-    # Using LeakyReLU instead of ReLU
     masked_input = layers.TimeDistributed(
         layers.Dense(input_shape[1], activation=tf.keras.layers.LeakyReLU(alpha=0.01))
     )(masked_input)

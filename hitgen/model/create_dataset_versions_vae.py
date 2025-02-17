@@ -173,7 +173,7 @@ class CreateTransformedVersionsCVAE:
         self.unique_ids = self.df["unique_id"].unique()
 
     @staticmethod
-    def load_data(dataset_name, group):
+    def load_data(dataset_name: str, group: str) -> Tuple[pd.DataFrame, int, str]:
         data_cls = DATASETS[dataset_name]
         print(dataset_name, group)
 
@@ -186,7 +186,7 @@ class CreateTransformedVersionsCVAE:
         n_lags = data_cls.context_length[group]
         freq = data_cls.frequency_pd[group]
         season_len = data_cls.frequency_map[group]
-        n_series = ds.nunique()["unique_id"]
+        n_series = int(ds.nunique()["unique_id"])
         return ds, n_series, freq
 
     def create_dataset_long_form(self, data, unique_ids=None) -> pd.DataFrame:
