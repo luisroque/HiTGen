@@ -904,7 +904,7 @@ class CreateTransformedVersionsCVAE:
         """
         Run Optuna hyperparameter tuning for the CVAE and train the best model.
         """
-        study_name = "opt_vae"
+        study_name = f"{self.dataset_name}_{self.dataset_group}_opt_vae"
 
         storage = "sqlite:///optuna_study.db"
 
