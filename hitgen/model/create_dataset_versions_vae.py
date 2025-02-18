@@ -735,7 +735,14 @@ class CreateTransformedVersionsCVAE:
         """
         # try:
         latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
-        window_size = trial.suggest_int("window_size", 4, 8)
+        if self.freq == "M" or self.freq == "MS":
+            window_size = trial.suggest_int("window_size", 3, 24, step=3)
+        elif self.freq == "Q" or self.freq == "QS":
+            window_size = trial.suggest_int("window_size", 4, 12, step=2)
+        elif self.freq == "Y" or self.freq == "YS":
+            window_size = trial.suggest_int("window_size", 2, 6, step=1)
+        else:
+            window_size = trial.suggest_int("window_size", 4, 24, step=1)
         patience = trial.suggest_int("patience", 20, 40, step=5)
         kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
         n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
@@ -745,7 +752,7 @@ class CreateTransformedVersionsCVAE:
         kernel_size = trial.suggest_int("kernel_size", 2, 5)
         pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
         batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-        epochs = trial.suggest_int("epochs", 200, 2000, step=100)
+        epochs = trial.suggest_int("epochs", 200, 1600, step=100)
         learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
         # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
         # forecasting = trial.suggest_categorical("forecasting", [True, False])
@@ -907,9 +914,9 @@ class CreateTransformedVersionsCVAE:
 
         feature_dict = self._feature_engineering()
 
-        data_train = feature_dict["x_train_wide"]
-        mask_train = feature_dict["mask_train_wide"]
-        dyn_features_train = feature_dict["fourier_features_train"]
+        original_data = feature_dict["x_original_wide"]
+        original_mask = feature_dict["mask_original_wide"]
+        original_features = feature_dict["fourier_features_original"]
 
         study = optuna.create_study(
             study_name=study_name,
@@ -944,9 +951,9 @@ class CreateTransformedVersionsCVAE:
         print(f"Best Hyperparameters: {self.best_params}")
 
         data_mask_temporalized = TemporalizeGenerator(
-            data_train,
-            mask_train,
-            dyn_features_train,
+            original_data,
+            original_mask,
+            original_features,
             window_size=self.best_params["window_size"],
             batch_size=self.best_params["batch_size"],
             shuffle=self.best_params["shuffle"],
