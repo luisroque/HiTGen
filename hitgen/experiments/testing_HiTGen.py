@@ -263,13 +263,7 @@ if __name__ == "__main__":
                     f"Configuration for {DATASET} - {DATASET_GROUP} not found."
                 )
 
-            dataset_config = DATASETS_HYPERPARAMS_CONFIGS[DATASET][DATASET_GROUP]
-
-            TOP = None
-            VAL_STEPS = 0
-
-            # HITGEN Configurations
-            # hitgen_config = dataset_config["hitgen"]
+            # dataset_config = DATASETS_HYPERPARAMS_CONFIGS[DATASET][DATASET_GROUP]
 
             # TIMEGAN Configurations
             # timegan_config = dataset_config["timegan"]
@@ -287,7 +281,6 @@ if __name__ == "__main__":
                 dataset_name=DATASET,
                 dataset_group=DATASET_GROUP,
                 freq=FREQ,
-                top=TOP,
             )
 
             # hypertuning

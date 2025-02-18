@@ -2,34 +2,25 @@ import os
 import gc
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from typing import Optional, List, Tuple, Dict
 import json
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 import optuna
 from tensorflow import keras
 import tensorflow as tf
-from tensorflow import data as tfdata
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from tensorflow import (
-    float32,
-)
 from hitgen.model.models import (
     CVAE,
-    KLAnnealingAndNoiseScalingCallback,
     TemporalizeGenerator,
 )
 from hitgen.feature_engineering.feature_transformations import (
     detemporalize,
 )
-from hitgen.preprocessing.pre_processing_datasets import (
-    PreprocessDatasets as ppc,
-)
 from hitgen.model.models import get_CVAE
 from hitgen.metrics.discriminative_score import (
     compute_discriminative_score,
 )
-from hitgen.load_data.config import DATASETS, DATASETS_FREQ
+from hitgen.load_data.config import DATASETS
 from hitgen.visualization.model_visualization import (
     plot_generated_vs_original,
 )
@@ -61,16 +52,8 @@ class CreateTransformedVersionsCVAE:
         freq: str,
         batch_size: int = 8,
         shuffle: bool = False,
-        input_dir: str = "./assets/",
-        transf_data: str = "whole",
-        top: int = None,
-        weekly_m5: bool = True,
-        test_size: int = None,
-        num_base_series_time_points: int = 100,
-        num_variants: int = 20,
         noise_scale: float = 0.1,
         amplitude: float = 1.0,
-        stride_temporalize: int = 2,
         bi_rnn: bool = False,
         forecasting: bool = True,
         conv1d_blocks_backcast=2,
@@ -79,7 +62,6 @@ class CreateTransformedVersionsCVAE:
         conv1d_blocks_forecast=2,
         filters_forecast=64,
         kernel_size_forecast=3,
-        annealing: bool = False,
         kl_weight_init: float = 0.1,
         noise_scale_init: float = 0.1,
         n_blocks_encoder: int = 3,
@@ -92,22 +74,13 @@ class CreateTransformedVersionsCVAE:
     ):
         self.dataset_name = dataset_name
         self.dataset_group = dataset_group
-        self.input_dir = input_dir
-        self.transf_data = transf_data
         self.freq = freq
-        self.top = top
-        self.test_size = test_size
-        self.weekly_m5 = weekly_m5
-        self.num_base_series_time_points = num_base_series_time_points
-        self.num_variants = num_variants
         self.noise_scale = noise_scale
         self.amplitude = amplitude
-        self.stride_temporalize = stride_temporalize
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.bi_rnn = bi_rnn
         self.forecasting = forecasting
-        self.annealing = annealing
         self.kl_weight_init = kl_weight_init
         self.noise_scale_init = noise_scale_init
         self.n_blocks_encoder = n_blocks_encoder
@@ -140,7 +113,6 @@ class CreateTransformedVersionsCVAE:
         print(f"   - Average number of time points per series: {avg_time_points:.2f}")
 
         self.features_input = (None, None, None)
-        self._create_directories()
         self.long_properties = {}
         self.split_path = f"assets/model_weights/data_split/{dataset_name}_{dataset_group}_data_split.json"
         self.unique_ids = self.df["unique_id"].unique()
@@ -155,10 +127,7 @@ class CreateTransformedVersionsCVAE:
         except FileNotFoundError as e:
             print(f"Error loading data for {dataset_name} - {group}: {e}")
 
-        h = data_cls.horizons_map[group]
-        n_lags = data_cls.context_length[group]
         freq = data_cls.frequency_pd[group]
-        season_len = data_cls.frequency_map[group]
         n_series = int(ds.nunique()["unique_id"])
         return ds, n_series, freq
 
@@ -178,13 +147,6 @@ class CreateTransformedVersionsCVAE:
         data_long = df.melt(id_vars=["ds"], var_name="unique_id", value_name="y")
 
         return data_long
-
-    def _create_directories(self):
-        """
-        Create dynamically the directories to store the data if they don't exist
-        """
-        # Create directory to store transformed datasets if does not exist
-        Path(f"{self.input_dir}data").mkdir(parents=True, exist_ok=True)
 
     def _load_or_create_split(
         self,
@@ -504,8 +466,8 @@ class CreateTransformedVersionsCVAE:
 
     def fit(
         self,
+        window_size: int,
         epochs: int = 750,
-        window_size: int = 6,
         patience: int = 30,
         latent_dim: int = 32,
         learning_rate: float = 0.001,
@@ -524,7 +486,6 @@ class CreateTransformedVersionsCVAE:
             original_mask,
             original_features,
             window_size=window_size,
-            stride=self.stride_temporalize,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
         )
@@ -770,15 +731,14 @@ class CreateTransformedVersionsCVAE:
         """
         # try:
         latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
-        window_size = trial.suggest_int("window_size", 4, 8, step=1)
-        # if self.freq == "M" or self.freq == "MS":
-        #     window_size = trial.suggest_int("window_size", 6, 24, step=3)
-        # elif self.freq == "Q" or self.freq == "QS":
-        #     window_size = trial.suggest_int("window_size", 4, 12, step=2)
-        # elif self.freq == "Y" or self.freq == "YS":
-        #     window_size = trial.suggest_int("window_size", 2, 6, step=1)
-        # else:
-        #     window_size = trial.suggest_int("window_size", 4, 24, step=1)
+        if self.freq == "M" or self.freq == "MS":
+            window_size = trial.suggest_int("window_size", 3, 24, step=3)
+        elif self.freq == "Q" or self.freq == "QS":
+            window_size = trial.suggest_int("window_size", 4, 12, step=2)
+        elif self.freq == "Y" or self.freq == "YS":
+            window_size = trial.suggest_int("window_size", 2, 6, step=1)
+        else:
+            window_size = trial.suggest_int("window_size", 4, 24, step=1)
         patience = trial.suggest_int("patience", 20, 40, step=5)
         kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
         n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
@@ -823,7 +783,6 @@ class CreateTransformedVersionsCVAE:
             train_mask,
             train_dyn_features,
             window_size=window_size,
-            stride=self.stride_temporalize,
             batch_size=batch_size,
             shuffle=shuffle,
         )
