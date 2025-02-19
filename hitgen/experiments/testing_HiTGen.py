@@ -164,13 +164,13 @@ DATASETS_HYPERPARAMS_CONFIGS = {
 }
 
 DATASET_GROUP_FREQ = {
-    "Tourism": {
-        "Monthly": {"FREQ": "M", "H": 24},
-    },
-    # "M1": {
+    # "Tourism": {
     #     "Monthly": {"FREQ": "M", "H": 24},
-    #     "Quarterly": {"FREQ": "Q", "H": 8},
     # },
+    "M1": {
+        "Monthly": {"FREQ": "M", "H": 24},
+        "Quarterly": {"FREQ": "Q", "H": 8},
+    },
     # "M3": {
     #     "Monthly": {"FREQ": "M", "H": 24},
     #     "Quarterly": {"FREQ": "Q", "H": 8},
@@ -430,7 +430,7 @@ if __name__ == "__main__":
 
             # metaforecast methods
             synthetic_metaforecast_long_no_transf = workflow_metaforecast_methods(
-                df=original_data_no_transf_long.fillna(value=0),
+                df=original_data_no_transf_long.dropna(),
                 freq=FREQ,
                 dataset=DATASET,
                 dataset_group=DATASET_GROUP,
