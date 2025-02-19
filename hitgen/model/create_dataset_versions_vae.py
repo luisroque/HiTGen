@@ -520,7 +520,7 @@ class CreateTransformedVersionsCVAE:
         cvae.compile(
             optimizer=keras.optimizers.Adam(
                 learning_rate=learning_rate,
-                clipnorm=1.0,
+                # clipnorm=1.0,
             ),
             metrics=[cvae.reconstruction_loss_tracker, cvae.kl_loss_tracker],
         )
@@ -812,7 +812,9 @@ class CreateTransformedVersionsCVAE:
             encoder, decoder, kl_weight_initial=kl_weight, forecasting=forecasting
         )
         cvae.compile(
-            optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
+            optimizer=keras.optimizers.Adam(
+                learning_rate=learning_rate,
+            ),
             metrics=[cvae.reconstruction_loss_tracker, cvae.kl_loss_tracker],
         )
 
@@ -823,12 +825,15 @@ class CreateTransformedVersionsCVAE:
             mode="auto",
             restore_best_weights=True,
         )
+        reduce_lr = ReduceLROnPlateau(
+            monitor="loss", factor=0.2, patience=10, min_lr=1e-6, cooldown=3, verbose=1
+        )
 
         history = cvae.fit(
             x=data_mask_temporalized,
             epochs=epochs,
             batch_size=batch_size,
-            callbacks=[es],
+            callbacks=[es, reduce_lr],
         )
 
         loss = min(history.history["loss"])
@@ -993,21 +998,62 @@ class CreateTransformedVersionsCVAE:
         early_stopping = tf.keras.callbacks.EarlyStopping(
             monitor="loss",
             patience=self.best_params["patience"],
+            mode="auto",
             restore_best_weights=True,
         )
-        history = cvae.fit(
-            x=data_mask_temporalized,
-            epochs=self.best_params["epochs"],
-            batch_size=self.best_params["batch_size"],
-            callbacks=[early_stopping],
+        reduce_lr = ReduceLROnPlateau(
+            monitor="loss", factor=0.2, patience=10, min_lr=1e-6, cooldown=3, verbose=1
         )
 
-        # Save training history
-        with open(
-            f"assets/model_weights/{self.dataset_name}_{self.dataset_group}_training_history.json",
-            "w",
-        ) as f:
-            json.dump(history.history, f)
+        weights_folder = "assets/model_weights"
+        os.makedirs(weights_folder, exist_ok=True)
+
+        weights_file = os.path.join(
+            weights_folder, f"{self.dataset_name}_{self.dataset_group}__vae.weights.h5"
+        )
+        history_file = os.path.join(
+            weights_folder,
+            f"{self.dataset_name}_{self.dataset_group}_training_history.json",
+        )
+        history = None
+
+        if os.path.exists(weights_file):
+            print("Loading existing weights...")
+            cvae.load_weights(weights_file)
+
+            if os.path.exists(history_file):
+                print("Loading training history...")
+                with open(history_file, "r") as f:
+                    history = json.load(f)
+            else:
+                print("No history file found. Skipping history loading.")
+        else:
+
+            mc = ModelCheckpoint(
+                weights_file,
+                save_best_only=True,
+                save_weights_only=True,
+                monitor="loss",
+                mode="auto",
+                verbose=1,
+            )
+
+            history = cvae.fit(
+                x=data_mask_temporalized,
+                epochs=self.best_params["epochs"],
+                batch_size=self.best_params["batch_size"],
+                shuffle=False,
+                callbacks=[early_stopping, mc, reduce_lr],
+            )
+
+            if history is not None:
+                history = history.history
+                history_dict = {
+                    key: [float(val) for val in values]
+                    for key, values in history.items()
+                }
+                with open(history_file, "w") as f:
+                    json.dump(history_dict, f)
 
         print("Training completed with the best hyperparameters.")
         return cvae

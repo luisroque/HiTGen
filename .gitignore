@@ -191,3 +191,5 @@ workspace/
 
 lightning_logs
 datasets
+
+optuna_study.db
