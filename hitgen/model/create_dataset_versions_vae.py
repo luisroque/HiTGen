@@ -548,6 +548,13 @@ class CreateTransformedVersionsCVAE:
         )
         history = None
 
+        dummy_input = (
+            tf.random.normal((1, window_size, self.s)),  # batch_data
+            tf.ones((1, window_size, self.s)),  # batch_mask
+            tf.random.normal((1, window_size, 6)),  # batch_dyn_features
+        )
+        _ = cvae(dummy_input)
+
         if os.path.exists(weights_file) and not hyper_tuning and load_weights:
             print("Loading existing weights...")
             cvae.load_weights(weights_file)
@@ -568,13 +575,6 @@ class CreateTransformedVersionsCVAE:
                 mode="auto",
                 verbose=1,
             )
-
-            dummy_input = (
-                tf.random.normal((1, window_size, self.s)),  # batch_data
-                tf.ones((1, window_size, self.s)),  # batch_mask
-                tf.random.normal((1, window_size, 6)),  # batch_dyn_features
-            )
-            _ = cvae(dummy_input)
 
             history = cvae.fit(
                 x=data_mask_temporalized,
@@ -1025,6 +1025,17 @@ class CreateTransformedVersionsCVAE:
         )
         history = None
 
+        dummy_input = (
+            tf.random.normal(
+                (1, self.best_params["window_size"], self.s)
+            ),  # batch_data
+            tf.ones((1, self.best_params["window_size"], self.s)),  # batch_mask
+            tf.random.normal(
+                (1, self.best_params["window_size"], 6)
+            ),  # batch_dyn_features
+        )
+        _ = cvae(dummy_input)
+
         if os.path.exists(weights_file):
             print("Loading existing weights...")
             cvae.load_weights(weights_file)
@@ -1045,17 +1056,6 @@ class CreateTransformedVersionsCVAE:
                 mode="auto",
                 verbose=1,
             )
-
-            dummy_input = (
-                tf.random.normal(
-                    (1, self.best_params["window_size"], self.s)
-                ),  # batch_data
-                tf.ones((1, self.best_params["window_size"], self.s)),  # batch_mask
-                tf.random.normal(
-                    (1, self.best_params["window_size"], 6)
-                ),  # batch_dyn_features
-            )
-            _ = cvae(dummy_input)
 
             history = cvae.fit(
                 x=data_mask_temporalized,
