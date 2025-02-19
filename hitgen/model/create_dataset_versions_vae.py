@@ -569,6 +569,13 @@ class CreateTransformedVersionsCVAE:
                 verbose=1,
             )
 
+            dummy_input = (
+                tf.random.normal((1, window_size, self.s)),  # batch_data
+                tf.ones((1, window_size, self.s)),  # batch_mask
+                tf.random.normal((1, window_size, 6)),  # batch_dyn_features
+            )
+            _ = cvae(dummy_input)
+
             history = cvae.fit(
                 x=data_mask_temporalized,
                 epochs=epochs,
@@ -1049,8 +1056,6 @@ class CreateTransformedVersionsCVAE:
                 ),  # batch_dyn_features
             )
             _ = cvae(dummy_input)
-
-            print("Is model built?", cvae.built)
 
             history = cvae.fit(
                 x=data_mask_temporalized,
