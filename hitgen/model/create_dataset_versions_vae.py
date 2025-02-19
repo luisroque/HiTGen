@@ -961,12 +961,6 @@ class CreateTransformedVersionsCVAE:
             shuffle=self.best_params["shuffle"],
         )
 
-        print("Generator length:", len(data_mask_temporalized))
-        for idx, batch in enumerate(data_mask_temporalized):
-            print(f"\nFirst batch index: {idx}")
-            for i, item in enumerate(batch):
-                print(f"  Element {i}: {type(item)}")
-            break
         encoder, decoder = get_CVAE(
             window_size=self.best_params["window_size"],
             n_series=self.s,
@@ -1044,6 +1038,8 @@ class CreateTransformedVersionsCVAE:
                 mode="auto",
                 verbose=1,
             )
+
+            print("Is model built?", cvae.built)
 
             history = cvae.fit(
                 x=data_mask_temporalized,
