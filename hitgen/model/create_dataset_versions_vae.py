@@ -1039,6 +1039,17 @@ class CreateTransformedVersionsCVAE:
                 verbose=1,
             )
 
+            dummy_input = (
+                tf.random.normal(
+                    (1, self.best_params["window_size"], self.s)
+                ),  # batch_data
+                tf.ones((1, self.best_params["window_size"], self.s)),  # batch_mask
+                tf.random.normal(
+                    (1, self.best_params["window_size"], 6)
+                ),  # batch_dyn_features
+            )
+            _ = cvae(dummy_input)
+
             print("Is model built?", cvae.built)
 
             history = cvae.fit(
