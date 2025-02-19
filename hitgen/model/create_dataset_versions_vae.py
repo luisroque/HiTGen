@@ -833,6 +833,7 @@ class CreateTransformedVersionsCVAE:
             x=data_mask_temporalized,
             epochs=epochs,
             batch_size=batch_size,
+            shuffle=False,
             callbacks=[es, reduce_lr],
         )
 
@@ -960,6 +961,10 @@ class CreateTransformedVersionsCVAE:
             shuffle=self.best_params["shuffle"],
         )
 
+        print("Generator length:", len(data_mask_temporalized))
+        for idx, batch in enumerate(data_mask_temporalized):
+            print(f"First batch index: {idx}, shape(s): {[b.shape for b in batch]}")
+            break
         encoder, decoder = get_CVAE(
             window_size=self.best_params["window_size"],
             n_series=self.s,
