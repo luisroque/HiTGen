@@ -539,6 +539,17 @@ if __name__ == "__main__":
                     ].copy()
                 )
 
+                plot_generated_vs_original(
+                    synth_data=synthetic_metaforecast_long_no_transf_method,
+                    original_test_data=test_data_no_transf_long.dropna(subset=["y"]),
+                    score=0.0,
+                    loss=0.0,
+                    dataset_name=DATASET,
+                    dataset_group=DATASET_GROUP,
+                    n_series=8,
+                    suffix_name=f"{method}_no_transf",
+                )
+
                 print(
                     f"\nComputing discriminative score for {method} synthetic data generation..."
                 )
