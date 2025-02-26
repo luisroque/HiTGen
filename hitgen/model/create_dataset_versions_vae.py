@@ -117,6 +117,28 @@ class CreateTransformedVersionsCVAE:
         self.split_path = f"assets/model_weights/data_split/{dataset_name}_{dataset_group}_data_split.json"
         self.unique_ids = self.df["unique_id"].unique()
 
+        feature_dict = self._feature_engineering()
+
+        self.original_data = feature_dict["x_original_wide"]
+        self.train_data_long = feature_dict["original_data_train_long"]
+        self.test_data_long = feature_dict["original_data_test_long"]
+        self.original_data_long = feature_dict["original_data_long"]
+        self.original_mask = feature_dict["mask_original_wide"]
+        self.original_data_no_transf_long = feature_dict["original_data_no_transf_long"]
+        self.original_data_train_no_transf_long = feature_dict[
+            "original_data_train_no_transf_long"
+        ]
+        self.original_data_test_no_transf_long = feature_dict[
+            "original_data_test_no_transf_long"
+        ]
+        self.test_dyn_features = feature_dict["fourier_features_test"]
+        self.original_dyn_features = feature_dict["fourier_features_original"]
+        self.original_mask = feature_dict["mask_original_wide"]
+        self.original_features = feature_dict["fourier_features_original"]
+        self.train_data = feature_dict["x_train_wide"]
+        self.train_mask = feature_dict["mask_train_wide"]
+        self.train_dyn_features = feature_dict["fourier_features_train"]
+
     @staticmethod
     def load_data(dataset_name: str, group: str) -> Tuple[pd.DataFrame, int, str]:
         data_cls = DATASETS[dataset_name]
@@ -124,6 +146,9 @@ class CreateTransformedVersionsCVAE:
 
         try:
             ds = data_cls.load_data(group)
+
+            # for testing purposes only
+            ds = ds[ds["unique_id"].isin(ds["unique_id"].unique()[:20])]
         except FileNotFoundError as e:
             print(f"Error loading data for {dataset_name} - {group}: {e}")
 
@@ -475,16 +500,11 @@ class CreateTransformedVersionsCVAE:
         load_weights: bool = True,
     ) -> tuple[CVAE, dict, EarlyStopping]:
         """Training our CVAE"""
-        feature_dict = self._feature_engineering()
-
-        original_data = feature_dict["x_original_wide"]
-        original_mask = feature_dict["mask_original_wide"]
-        original_features = feature_dict["fourier_features_original"]
 
         data_mask_temporalized = TemporalizeGenerator(
-            original_data,
-            original_mask,
-            original_features,
+            self.original_data,
+            self.original_mask,
+            self.original_features,
             window_size=window_size,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
@@ -755,7 +775,7 @@ class CreateTransformedVersionsCVAE:
         kernel_size = trial.suggest_int("kernel_size", 2, 5)
         pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
         batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-        epochs = trial.suggest_int("epochs", 200, 1600, step=100)
+        epochs = trial.suggest_int("epochs", 5, 20, step=1)
         learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
         # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
         # forecasting = trial.suggest_categorical("forecasting", [True, False])
@@ -776,19 +796,10 @@ class CreateTransformedVersionsCVAE:
         shuffle = False
         forecasting = True
 
-        feature_dict = self._feature_engineering()
-
-        train_data = feature_dict["x_train_wide"]
-        train_mask = feature_dict["mask_train_wide"]
-        original_data_train_no_transf_long = feature_dict[
-            "original_data_train_no_transf_long"
-        ]
-        train_dyn_features = feature_dict["fourier_features_train"]
-
         data_mask_temporalized = TemporalizeGenerator(
-            train_data,
-            train_mask,
-            train_dyn_features,
+            self.train_data,
+            self.train_mask,
+            self.train_dyn_features,
             window_size=window_size,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -854,8 +865,8 @@ class CreateTransformedVersionsCVAE:
         # compute the discriminative score x times to account for variability
 
         score = self.compute_mean_discriminative_score(
-            unique_ids=original_data_train_no_transf_long["unique_id"].unique(),
-            original_data=original_data_train_no_transf_long,
+            unique_ids=self.original_data_train_no_transf_long["unique_id"].unique(),
+            original_data=self.original_data_train_no_transf_long.dropna(subset=["y"]),
             synthetic_data=synthetic_data_long_no_transf,
             method="hitgen",
             freq="M",
@@ -873,7 +884,7 @@ class CreateTransformedVersionsCVAE:
             raise optuna.exceptions.TrialPruned()
 
         self.update_best_scores(
-            original_data=original_data_train_no_transf_long,
+            original_data=self.original_data_train_no_transf_long,
             synthetic_data=synthetic_data_long_no_transf,
             score=score,
             latent_dim=latent_dim,
@@ -921,12 +932,6 @@ class CreateTransformedVersionsCVAE:
 
         storage = "sqlite:///optuna_study.db"
 
-        feature_dict = self._feature_engineering()
-
-        original_data = feature_dict["x_original_wide"]
-        original_mask = feature_dict["mask_original_wide"]
-        original_features = feature_dict["fourier_features_original"]
-
         study = optuna.create_study(
             study_name=study_name,
             storage=storage,
@@ -938,13 +943,15 @@ class CreateTransformedVersionsCVAE:
             print("No trials have been completed yet. Running hyperparameter tuning...")
             study.optimize(self.objective, n_trials=n_trials)
 
-        if len(study.trials) == 0:
-            raise RuntimeError(
-                "Optuna tuning did not complete successfully. No trials were found."
+        try:
+            best_trial = study.best_trial
+        except ValueError:
+            print(
+                "No best trial found, likely due to no successful trials. Rerunning optimization..."
             )
+            study.optimize(self.objective, n_trials=n_trials)
+            best_trial = study.best_trial
 
-        # retrieve the best trial
-        best_trial = study.best_trial
         self.best_params = best_trial.params
 
         self.best_params["bi_rnn"] = False
@@ -960,9 +967,9 @@ class CreateTransformedVersionsCVAE:
         print(f"Best Hyperparameters: {self.best_params}")
 
         data_mask_temporalized = TemporalizeGenerator(
-            original_data,
-            original_mask,
-            original_features,
+            self.original_data,
+            self.original_mask,
+            self.original_features,
             window_size=self.best_params["window_size"],
             batch_size=self.best_params["batch_size"],
             shuffle=self.best_params["shuffle"],
@@ -1135,6 +1142,30 @@ class CreateTransformedVersionsCVAE:
         ]
         X_hat_all_long_no_transf = x_hat_long_no_transf
 
+        X_hat_train_long = X_hat_train_long[
+            ~self.original_data_train_no_transf_long["y"].isna().values
+        ]
+
+        X_hat_test_long = X_hat_test_long[
+            ~self.original_data_test_no_transf_long["y"].isna().values
+        ]
+
+        X_hat_all_long = X_hat_all_long[
+            ~self.original_data_no_transf_long["y"].isna().values
+        ]
+
+        X_hat_train_long_no_transf = X_hat_train_long_no_transf[
+            ~self.original_data_train_no_transf_long["y"].isna().values
+        ]
+
+        X_hat_test_long_no_transf = X_hat_test_long_no_transf[
+            ~self.original_data_test_no_transf_long["y"].isna().values
+        ]
+
+        X_hat_all_long_no_transf = X_hat_all_long_no_transf[
+            ~self.original_data_no_transf_long["y"].isna().values
+        ]
+
         return (
             X_hat_train_long,
             X_hat_test_long,
@@ -1152,6 +1183,7 @@ class CreateTransformedVersionsCVAE:
         train_size_absolute=None,
     ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Predict original time series using VAE"""
+
         z_mean, z_log_var, z = cvae.encoder.predict(
             [
                 data_mask_temporalized.temporalized_data,
@@ -1183,6 +1215,14 @@ class CreateTransformedVersionsCVAE:
         X_hat_train_long = x_hat_long[x_hat_long["unique_id"].isin(train_ids)]
         X_hat_train_long_no_transf = x_hat_long_no_transf[
             x_hat_long_no_transf["unique_id"].isin(train_ids)
+        ]
+
+        X_hat_train_long_no_transf = X_hat_train_long_no_transf[
+            ~self.original_data_train_no_transf_long["y"].isna().values
+        ]
+
+        X_hat_train_long = X_hat_train_long[
+            ~self.original_data_train_no_transf_long["y"].isna().values
         ]
 
         return X_hat_train_long, X_hat_train_long_no_transf

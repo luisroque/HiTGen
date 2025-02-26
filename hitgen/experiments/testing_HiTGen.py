@@ -164,13 +164,13 @@ DATASETS_HYPERPARAMS_CONFIGS = {
 }
 
 DATASET_GROUP_FREQ = {
-    # "Tourism": {
-    #     "Monthly": {"FREQ": "M", "H": 24},
-    # },
-    "M1": {
+    "Tourism": {
         "Monthly": {"FREQ": "M", "H": 24},
-        "Quarterly": {"FREQ": "Q", "H": 8},
     },
+    # "M1": {
+    #     "Monthly": {"FREQ": "M", "H": 24},
+    #     "Quarterly": {"FREQ": "Q", "H": 8},
+    # },
     # "M3": {
     #     "Monthly": {"FREQ": "M", "H": 24},
     #     "Quarterly": {"FREQ": "Q", "H": 8},
@@ -340,17 +340,6 @@ if __name__ == "__main__":
             #
             # synth_hitgen = detemporalize(generated_data)
 
-            plot_generated_vs_original(
-                synth_data=synth_hitgen_test_long_no_transf,
-                original_test_data=test_data_no_transf_long,
-                score=0.0,
-                loss=0.0,
-                dataset_name=DATASET,
-                dataset_group=DATASET_GROUP,
-                n_series=8,
-                suffix_name="hitgen_no_transf",
-            )
-
             # import matplotlib.pyplot as plt
             #
             # unique_ids = synth_hitgen_test_long["unique_id"].unique()[:4]
@@ -439,6 +428,17 @@ if __name__ == "__main__":
             synth_hitgen_test_long_no_transf = synth_hitgen_test_long_no_transf[
                 ~test_data_no_transf_long["y"].isna().values
             ]
+
+            plot_generated_vs_original(
+                synth_data=synth_hitgen_test_long_no_transf,
+                original_test_data=test_data_no_transf_long,
+                score=0.0,
+                loss=0.0,
+                dataset_name=DATASET,
+                dataset_group=DATASET_GROUP,
+                n_series=8,
+                suffix_name="hitgen_no_transf",
+            )
 
             if not hitgen_score_disc:
                 print("\nComputing discriminative score for HiTGen synthetic data...")
