@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from typing import Optional, List, Tuple, Dict
 import json
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import optuna
 from tensorflow import keras
 import tensorflow as tf
@@ -119,25 +119,29 @@ class CreateTransformedVersionsCVAE:
 
         feature_dict = self._feature_engineering()
 
-        self.original_data = feature_dict["x_original_wide"]
-        self.train_data_long = feature_dict["original_data_train_long"]
-        self.test_data_long = feature_dict["original_data_test_long"]
-        self.original_data_long = feature_dict["original_data_long"]
-        self.original_mask = feature_dict["mask_original_wide"]
-        self.original_data_no_transf_long = feature_dict["original_data_no_transf_long"]
-        self.original_data_train_no_transf_long = feature_dict[
-            "original_data_train_no_transf_long"
-        ]
-        self.original_data_test_no_transf_long = feature_dict[
-            "original_data_test_no_transf_long"
-        ]
-        self.test_dyn_features = feature_dict["fourier_features_test"]
+        self.original_wide = feature_dict["original_wide"]
+        self.original_train_wide = feature_dict["train_wide"]
+        self.original_test_wide = feature_dict["test_wide"]
+
+        self.original_long = feature_dict["original_long"]
+        self.original_train_long = feature_dict["train_long"]
+        self.original_test_long = feature_dict["test_long"]
+
+        self.mask_wide = feature_dict["mask_wide"]
+        self.mask_train_wide = feature_dict["mask_train_wide"]
+        self.mask_test_wide = feature_dict["mask_test_wide"]
+
+        self.original_long_transf = feature_dict["original_long_transf"]
+        self.original_train_long_transf = feature_dict["original_train_long_transf"]
+        self.original_test_long_transf = feature_dict["original_test_long_transf"]
+
+        self.original_wide_transf = feature_dict["original_wide_transf"]
+        self.original_train_wide_transf = feature_dict["original_train_wide_transf"]
+        self.original_test_wide_transf = feature_dict["original_test_wide_transf"]
+
         self.original_dyn_features = feature_dict["fourier_features_original"]
-        self.original_mask = feature_dict["mask_original_wide"]
-        self.original_features = feature_dict["fourier_features_original"]
-        self.train_data = feature_dict["x_train_wide"]
-        self.train_mask = feature_dict["mask_train_wide"]
         self.train_dyn_features = feature_dict["fourier_features_train"]
+        self.test_dyn_features = feature_dict["fourier_features_test"]
 
     @staticmethod
     def load_data(dataset_name: str, group: str) -> Tuple[pd.DataFrame, int, str]:
@@ -156,7 +160,7 @@ class CreateTransformedVersionsCVAE:
         n_series = int(ds.nunique()["unique_id"])
         return ds, n_series, freq
 
-    def create_dataset_long_form(self, data, unique_ids=None) -> pd.DataFrame:
+    def create_dataset_long_form(self, data, original, unique_ids=None) -> pd.DataFrame:
         df = pd.DataFrame(data)
 
         if unique_ids is None:
@@ -170,8 +174,34 @@ class CreateTransformedVersionsCVAE:
         )
 
         data_long = df.melt(id_vars=["ds"], var_name="unique_id", value_name="y")
+        data_long = data_long.sort_values(by=["unique_id", "ds"])
+
+        # keep only values that exist in the original
+        data_long = data_long.merge(
+            original[["unique_id", "ds"]], on=["unique_id", "ds"], how="inner"
+        )
 
         return data_long
+
+    @staticmethod
+    def _create_dataset_wide_form(
+        data_long: pd.DataFrame, ids: List[str]
+    ) -> pd.DataFrame:
+        """
+        Transforms a long-form dataset back to wide form ensuring the
+        right order of the columns
+        """
+        if not {"ds", "unique_id", "y"}.issubset(data_long.columns):
+            raise ValueError(
+                "Input DataFrame must contain 'ds', 'unique_id', and 'y' columns."
+            )
+
+        data_long = data_long.sort_values(by=["unique_id", "ds"])
+        data_wide = data_long.pivot(index="ds", columns="unique_id", values="y")
+        data_wide = data_wide.fillna(0)
+        data_wide = data_wide.reindex(columns=ids)
+
+        return data_wide
 
     def _load_or_create_split(
         self,
@@ -287,11 +317,10 @@ class CreateTransformedVersionsCVAE:
         return x_diff
 
     def _preprocess_data(
-        self, df: pd.DataFrame
+        self, df: pd.DataFrame, ids: List[str]
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Sort and preprocess the data for feature engineering."""
-        df = df.sort_values(by=["unique_id", "ds"])
-        x_wide = df.pivot(index="ds", columns="unique_id", values="y")
+        x_wide = self._create_dataset_wide_form(df, ids)
 
         self.long_properties["ds"] = x_wide.reset_index()["ds"].values
         self.long_properties["unique_id"] = x_wide.columns.values
@@ -299,157 +328,102 @@ class CreateTransformedVersionsCVAE:
         # create mask before padding
         mask = (~x_wide.isna()).astype(int)
 
-        # x_wide_log_returns = self._transform_log_returns(x_wide)
-        # x_wide_diff = self._transform_diff(x_wide)
-
         # padding
         x_wide_filled = x_wide.fillna(0.0)
-        self.scaler = MinMaxScaler()
+        self.scaler = StandardScaler()
         scaled_data = self.scaler.fit_transform(x_wide_filled)
 
         return scaled_data, mask, x_wide
 
-    def plot_sample_time_series_long_format(self, df, data_cat, state):
-        import matplotlib.pyplot as plt
-
-        selected_ids = df["unique_id"].unique()[:8]
-        df_selected = df[df["unique_id"].isin(selected_ids)]
-
-        fig, axes = plt.subplots(nrows=4, ncols=2, figsize=(12, 10), sharex=True)
-
-        axes = axes.flatten()
-
-        for i, uid in enumerate(selected_ids):
-            subset = df_selected[df_selected["unique_id"] == uid]
-            ax = axes[i]
-            ax.plot(subset["ds"], subset["y"], marker="o", linestyle="-")
-            ax.set_title(f"Series: {uid}")
-            ax.grid(True)
-
-        plt.xlabel("Date")
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-
-        output_dir = "assets/plots/"
-        os.makedirs(output_dir, exist_ok=True)
-
-        output_path = os.path.join(
-            output_dir,
-            f"{self.dataset_name}_{self.dataset_group}_{data_cat}_{state}_time_series.png",
-        )
-        plt.savefig(output_path, dpi=300)
+    def _set_scaler_train(self, df: pd.DataFrame):
+        """Sort and preprocess the data for feature engineering."""
+        # padding
+        x_wide_filled = df.fillna(0.0)
+        self.scaler_train = StandardScaler()
+        scaled_data_train = self.scaler_train.fit_transform(x_wide_filled)
 
     def _feature_engineering(
         self, train_test_split=0.7, train_size_absolute=None
     ) -> Dict[str, pd.DataFrame]:
-        """Apply preprocessing to raw time series and split into training and testing."""
-        x_wide_transf, mask_wide, x_wide = self._preprocess_data(self.df)
-        x_long = self.create_dataset_long_form(x_wide)
-        x_long_transf = self.create_dataset_long_form(x_wide_transf)
-        # self.plot_sample_time_series_long_format(
-        #     x_long_transf, "original", "preprocess"
-        # )
+        """
+        Apply preprocessing to raw time series, split into training and testing,
+        compute periodic Fourier features, and return all relevant DataFrames.
+        """
+        self.ids = self.df["unique_id"].unique().sort()
+        original_wide_transf, mask_original_wide, original_wide = self._preprocess_data(
+            self.df, self.ids
+        )
 
-        mask_long = self.create_dataset_long_form(mask_wide)
+        original_long = self.create_dataset_long_form(original_wide, self.df)
+        original_long_transf = self.create_dataset_long_form(
+            original_wide_transf, self.df
+        )
+        mask_original_long = self.create_dataset_long_form(mask_original_wide, self.df)
 
-        train_ids, test_ids = self._load_or_create_split(
+        self.train_ids, self.test_ids = self._load_or_create_split(
             train_test_split, train_size_absolute
         )
+        self.train_ids.sort()
+        self.test_ids.sort()
+        self.s_train = len(self.train_ids)
 
-        self.s_train = len(train_ids)
-
-        train_data = x_long_transf[x_long_transf["unique_id"].isin(train_ids)]
-        train_data_no_transf = x_long[x_long["unique_id"].isin(train_ids)]
-        mask_train = mask_long[mask_long["unique_id"].isin(train_ids)]
-        test_data = x_long_transf[x_long_transf["unique_id"].isin(test_ids)]
-        test_data_no_transf = x_long[x_long["unique_id"].isin(test_ids)]
-        mask_test = mask_long[mask_long["unique_id"].isin(test_ids)]
-        original_data = x_long_transf
-        original_data_no_transf = x_long
-        original_mask = mask_long
-
-        x_train_wide = train_data.pivot(index="ds", columns="unique_id", values="y")
-        x_test_wide = test_data.pivot(index="ds", columns="unique_id", values="y")
-
-        # extract only training min/max params from the full scaler
-        train_columns = x_train_wide.columns
-        scaler_train = MinMaxScaler()
-
-        # filter the fitted params from self.scaler for only training series
-        scaler_train.min_ = self.scaler.min_[
-            np.isin(self.long_properties["unique_id"], train_columns)
+        # create training dfs
+        train_long = original_long[original_long["unique_id"].isin(self.train_ids)]
+        train_long_transf = original_long_transf[
+            original_long_transf["unique_id"].isin(self.train_ids)
         ]
-        scaler_train.scale_ = self.scaler.scale_[
-            np.isin(self.long_properties["unique_id"], train_columns)
-        ]
-        scaler_train.data_min_ = self.scaler.data_min_[
-            np.isin(self.long_properties["unique_id"], train_columns)
-        ]
-        scaler_train.data_max_ = self.scaler.data_max_[
-            np.isin(self.long_properties["unique_id"], train_columns)
-        ]
-        scaler_train.data_range_ = self.scaler.data_range_[
-            np.isin(self.long_properties["unique_id"], train_columns)
-        ]
-        scaler_train.feature_names_in = self.scaler.feature_names_in_[
-            np.isin(self.long_properties["unique_id"], train_columns)
+        mask_train_long = mask_original_long[
+            mask_original_long["unique_id"].isin(self.train_ids)
         ]
 
-        self.scaler_train = scaler_train
-
-        x_train_no_transf_wide = train_data_no_transf.pivot(
-            index="ds", columns="unique_id", values="y"
+        # convert training long -> wide
+        train_wide = self._create_dataset_wide_form(train_long, self.train_ids)
+        train_wide_transf = self._create_dataset_wide_form(
+            train_long_transf, self.train_ids
         )
-        x_test_no_transf_wide = test_data_no_transf.pivot(
-            index="ds", columns="unique_id", values="y"
+        mask_train_wide = self._create_dataset_wide_form(
+            mask_train_long, self.train_ids
         )
-        x_original_wide = original_data.pivot(
-            index="ds", columns="unique_id", values="y"
+
+        # set training scaler
+        self._set_scaler_train(train_wide)
+
+        test_long = original_long[original_long["unique_id"].isin(self.test_ids)]
+        test_long_transf = original_long_transf[
+            original_long_transf["unique_id"].isin(self.test_ids)
+        ]
+        mask_test_long = mask_original_long[
+            mask_original_long["unique_id"].isin(self.test_ids)
+        ]
+
+        # convert testing long -> wide
+        test_wide = self._create_dataset_wide_form(test_long, self.train_ids)
+        test_wide_transf = self._create_dataset_wide_form(
+            test_long_transf, self.train_ids
         )
-        x_original_no_transf_wide = original_data_no_transf.pivot(
-            index="ds", columns="unique_id", values="y"
-        )
-        mask_train_wide = mask_train.pivot(index="ds", columns="unique_id", values="y")
+        mask_test_wide = self._create_dataset_wide_form(mask_test_long, self.train_ids)
+
+        # convert mask to tensors
         self.mask_train_tf = tf.convert_to_tensor(
             mask_train_wide.values, dtype=tf.float32
         )
-        mask_test_wide = mask_test.pivot(index="ds", columns="unique_id", values="y")
         self.mask_test_tf = tf.convert_to_tensor(
             mask_test_wide.values, dtype=tf.float32
-        )
-        mask_original_wide = original_mask.pivot(
-            index="ds", columns="unique_id", values="y"
         )
         self.mask_original_tf = tf.convert_to_tensor(
             mask_original_wide.values, dtype=tf.float32
         )
 
-        original_data_train_long = x_train_wide.reset_index().melt(
-            id_vars=["ds"], var_name="unique_id", value_name="y"
-        )
-        original_data_train_no_transf_long = x_train_no_transf_wide.reset_index().melt(
-            id_vars=["ds"], var_name="unique_id", value_name="y"
-        )
-        original_data_test_long = x_test_wide.reset_index().melt(
-            id_vars=["ds"], var_name="unique_id", value_name="y"
-        )
-        original_data_test_no_transf_long = x_test_no_transf_wide.reset_index().melt(
-            id_vars=["ds"], var_name="unique_id", value_name="y"
-        )
-        original_data_long = x_original_wide.reset_index().melt(
-            id_vars=["ds"], var_name="unique_id", value_name="y"
-        )
-        original_data_no_transf_long = x_original_no_transf_wide.reset_index().melt(
-            id_vars=["ds"], var_name="unique_id", value_name="y"
-        )
-
-        self.X_train_raw = x_train_wide.reset_index(drop=True)
-        self.X_test_raw = x_test_wide.reset_index(drop=True)
-        self.X_orig_raw = x_original_wide.reset_index(drop=True)
+        self.X_train_raw = train_wide.reset_index(drop=True)
+        self.X_test_raw = test_wide.reset_index(drop=True)
+        self.X_orig_raw = original_wide.reset_index(drop=True)
 
         def compute_fourier_features(dates, n):
-            """Compute Fourier terms for a given frequency."""
-            t = dates.astype(np.int64) / 10**9  # convert datetime to seconds
+            """
+            Compute Fourier terms for a given frequency.
+            `self.freq` must be an attribute like 'D', 'W', 'M', etc.
+            """
+            t = dates.astype(np.int64) / 10**9
             freq_to_period = {
                 "D": 365.25,
                 "W": 52.18,
@@ -465,25 +439,34 @@ class CreateTransformedVersionsCVAE:
             for k in range(1, n + 1):
                 features[f"sin_{self.freq}_{k}"] = np.sin(2 * np.pi * k * t / period)
                 features[f"cos_{self.freq}_{k}"] = np.cos(2 * np.pi * k * t / period)
-            return pd.DataFrame(features)
+            return pd.DataFrame(features, index=dates)
 
-        fourier_features_train = compute_fourier_features(x_train_wide.index, 3)
-        fourier_features_test = compute_fourier_features(x_test_wide.index, 3)
-        fourier_features_original = compute_fourier_features(x_original_wide.index, 3)
+        fourier_features_train = compute_fourier_features(train_wide.index, 3)
+        fourier_features_test = compute_fourier_features(test_wide.index, 3)
+        fourier_features_original = compute_fourier_features(original_wide.index, 3)
 
         return {
-            "x_train_wide": x_train_wide,
-            "x_test_wide": x_test_wide,
-            "x_original_wide": x_original_wide,
-            "original_data_train_long": original_data_train_long,
-            "original_data_test_long": original_data_test_long,
-            "original_data_long": original_data_long,
+            # wide
+            "original_wide": original_wide,
+            "train_wide": train_wide,
+            "test_wide": test_wide,
+            # long
+            "original_long": original_long,
+            "train_long": train_long,
+            "test_long": test_long,
+            # mask wide
             "mask_train_wide": mask_train_wide,
             "mask_test_wide": mask_test_wide,
-            "mask_original_wide": mask_original_wide,
-            "original_data_no_transf_long": original_data_no_transf_long,
-            "original_data_train_no_transf_long": original_data_train_no_transf_long,
-            "original_data_test_no_transf_long": original_data_test_no_transf_long,
+            "mask_wide": mask_original_wide,
+            # transformed long
+            "original_long_transf": original_long_transf,
+            "original_train_long_transf": train_long_transf,
+            "original_test_long_transf": test_long_transf,
+            # wide long
+            "original_wide_transf": original_wide_transf,
+            "original_train_wide_transf": train_wide_transf,
+            "original_test_wide_transf": test_wide_transf,
+            # fourier features
             "fourier_features_train": fourier_features_train,
             "fourier_features_test": fourier_features_test,
             "fourier_features_original": fourier_features_original,
@@ -502,9 +485,9 @@ class CreateTransformedVersionsCVAE:
         """Training our CVAE"""
 
         data_mask_temporalized = TemporalizeGenerator(
-            self.original_data,
-            self.original_mask,
-            self.original_features,
+            self.original_wide_transf,
+            self.mask_wide,
+            self.original_dyn_features,
             window_size=window_size,
             batch_size=self.batch_size,
             shuffle=self.shuffle,
@@ -775,7 +758,7 @@ class CreateTransformedVersionsCVAE:
         kernel_size = trial.suggest_int("kernel_size", 2, 5)
         pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
         batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-        epochs = trial.suggest_int("epochs", 200, 2000, step=100)
+        epochs = trial.suggest_int("epochs", 5, 10, step=5)
         learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
         # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
         # forecasting = trial.suggest_categorical("forecasting", [True, False])
@@ -797,8 +780,8 @@ class CreateTransformedVersionsCVAE:
         forecasting = True
 
         data_mask_temporalized = TemporalizeGenerator(
-            self.train_data,
-            self.train_mask,
+            self.original_train_wide_transf,
+            self.mask_train_wide,
             self.train_dyn_features,
             window_size=window_size,
             batch_size=batch_size,
@@ -857,7 +840,7 @@ class CreateTransformedVersionsCVAE:
 
         loss = min(history.history["loss"])
 
-        _, synthetic_data_long_no_transf = self.predict_train(
+        synthetic_long = self.predict_train(
             cvae,
             data_mask_temporalized=data_mask_temporalized,
         )
@@ -865,9 +848,9 @@ class CreateTransformedVersionsCVAE:
         # compute the discriminative score x times to account for variability
 
         score = self.compute_mean_discriminative_score(
-            unique_ids=self.original_data_train_no_transf_long["unique_id"].unique(),
-            original_data=self.original_data_train_no_transf_long.dropna(subset=["y"]),
-            synthetic_data=synthetic_data_long_no_transf,
+            unique_ids=self.original_long["unique_id"].unique(),
+            original_data=self.original_long,
+            synthetic_data=synthetic_long,
             method="hitgen",
             freq="M",
             dataset_name=self.dataset_name,
@@ -884,8 +867,8 @@ class CreateTransformedVersionsCVAE:
             raise optuna.exceptions.TrialPruned()
 
         self.update_best_scores(
-            original_data=self.original_data_train_no_transf_long,
-            synthetic_data=synthetic_data_long_no_transf,
+            original_data=self.original_long,
+            synthetic_data=synthetic_long,
             score=score,
             latent_dim=latent_dim,
             window_size=window_size,
@@ -967,9 +950,9 @@ class CreateTransformedVersionsCVAE:
         print(f"Best Hyperparameters: {self.best_params}")
 
         data_mask_temporalized = TemporalizeGenerator(
-            self.original_data,
-            self.original_mask,
-            self.original_features,
+            self.original_wide_transf,
+            self.mask_wide,
+            self.original_dyn_features,
             window_size=self.best_params["window_size"],
             batch_size=self.best_params["batch_size"],
             shuffle=self.best_params["shuffle"],
@@ -1088,19 +1071,12 @@ class CreateTransformedVersionsCVAE:
         self,
         cvae: CVAE,
         data_mask_temporalized,
-        train_test_split=0.7,
-        train_size_absolute=None,
     ) -> Tuple[
-        pd.DataFrame,
-        pd.DataFrame,
-        pd.DataFrame,
         pd.DataFrame,
         pd.DataFrame,
         pd.DataFrame,
     ]:
         """Predict original time series using VAE"""
-        # new_latent_samples = np.random.normal(size=(samples, window_size, latent_dim))
-        # mask_temporalized = self.temporalize(self.mask_original_tf, window_size)
 
         z_mean, z_log_var, z = cvae.encoder.predict(
             [
@@ -1120,68 +1096,25 @@ class CreateTransformedVersionsCVAE:
             ]
         )
 
-        X_hat = detemporalize(generated_data)
-        X_hat_no_transf = self.scaler.inverse_transform(X_hat)
+        X_hat_wide_transf = detemporalize(generated_data)
+        X_hat_wide = self.scaler.inverse_transform(X_hat_wide_transf)
 
-        train_ids, test_ids = self._load_or_create_split(
-            train_test_split, train_size_absolute
-        )
+        X_hat_long = self.create_dataset_long_form(X_hat_wide, self.original_long)
 
-        x_hat_long = self.create_dataset_long_form(X_hat)
-        x_hat_long_no_transf = self.create_dataset_long_form(X_hat_no_transf)
-
-        X_hat_train_long = x_hat_long[x_hat_long["unique_id"].isin(train_ids)]
-        X_hat_test_long = x_hat_long[x_hat_long["unique_id"].isin(test_ids)]
-        X_hat_all_long = x_hat_long
-
-        X_hat_train_long_no_transf = x_hat_long_no_transf[
-            x_hat_long_no_transf["unique_id"].isin(train_ids)
-        ]
-        X_hat_test_long_no_transf = x_hat_long_no_transf[
-            x_hat_long_no_transf["unique_id"].isin(test_ids)
-        ]
-        X_hat_all_long_no_transf = x_hat_long_no_transf
-
-        X_hat_train_long = X_hat_train_long[
-            ~self.original_data_train_no_transf_long["y"].isna().values
-        ]
-
-        X_hat_test_long = X_hat_test_long[
-            ~self.original_data_test_no_transf_long["y"].isna().values
-        ]
-
-        X_hat_all_long = X_hat_all_long[
-            ~self.original_data_no_transf_long["y"].isna().values
-        ]
-
-        X_hat_train_long_no_transf = X_hat_train_long_no_transf[
-            ~self.original_data_train_no_transf_long["y"].isna().values
-        ]
-
-        X_hat_test_long_no_transf = X_hat_test_long_no_transf[
-            ~self.original_data_test_no_transf_long["y"].isna().values
-        ]
-
-        X_hat_all_long_no_transf = X_hat_all_long_no_transf[
-            ~self.original_data_no_transf_long["y"].isna().values
-        ]
+        X_hat_train_long = X_hat_long[X_hat_long["unique_id"].isin(self.train_ids)]
+        X_hat_test_long = X_hat_long[X_hat_long["unique_id"].isin(self.test_ids)]
 
         return (
+            X_hat_long,
             X_hat_train_long,
             X_hat_test_long,
-            X_hat_all_long,
-            X_hat_train_long_no_transf,
-            X_hat_test_long_no_transf,
-            X_hat_all_long_no_transf,
         )
 
     def predict_train(
         self,
         cvae: CVAE,
         data_mask_temporalized,
-        train_test_split=0.7,
-        train_size_absolute=None,
-    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    ) -> pd.DataFrame:
         """Predict original time series using VAE"""
 
         z_mean, z_log_var, z = cvae.encoder.predict(
@@ -1191,7 +1124,7 @@ class CreateTransformedVersionsCVAE:
                 data_mask_temporalized.temporalized_dyn_features,
             ]
         )
-        alpha = 3  # x times bigger variance
+        alpha = 0  # x times bigger variance
         epsilon = np.random.normal(size=z_mean.shape) * 0.1
         z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
         generated_data, predictions = cvae.decoder.predict(
@@ -1202,27 +1135,11 @@ class CreateTransformedVersionsCVAE:
             ]
         )
 
-        train_ids, test_ids = self._load_or_create_split(
-            train_test_split, train_size_absolute
+        X_hat_transf = detemporalize(generated_data)
+        X_hat = self.scaler_train.inverse_transform(X_hat_transf)
+
+        x_hat_train_long = self.create_dataset_long_form(
+            X_hat, self.original_train_long, self.train_ids
         )
 
-        X_hat = detemporalize(generated_data)
-        X_hat_no_transf = self.scaler_train.inverse_transform(X_hat)
-
-        x_hat_long = self.create_dataset_long_form(X_hat, train_ids)
-        x_hat_long_no_transf = self.create_dataset_long_form(X_hat_no_transf, train_ids)
-
-        X_hat_train_long = x_hat_long[x_hat_long["unique_id"].isin(train_ids)]
-        X_hat_train_long_no_transf = x_hat_long_no_transf[
-            x_hat_long_no_transf["unique_id"].isin(train_ids)
-        ]
-
-        X_hat_train_long_no_transf = X_hat_train_long_no_transf[
-            ~self.original_data_train_no_transf_long["y"].isna().values
-        ]
-
-        X_hat_train_long = X_hat_train_long[
-            ~self.original_data_train_no_transf_long["y"].isna().values
-        ]
-
-        return X_hat_train_long, X_hat_train_long_no_transf
+        return x_hat_train_long

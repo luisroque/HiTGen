@@ -286,95 +286,23 @@ if __name__ == "__main__":
             # hypertuning
             model = create_dataset_vae.hyper_tune_and_train()
 
-            # fit
-            # model, history, _ = create_dataset_vae.fit(
-            #     latent_dim=LATENT_DIM_HITGEN,
-            #     epochs=EPOCHS_HITGEN,
-            #     patience=PATIENCE_HITGEN,
-            #     learning_rate=LEARNING_RATE_HITGEN,
-            # )
-            # plot_loss(history)
-
-            feature_dict = create_dataset_vae._feature_engineering()
-
-            original_data = feature_dict["x_original_wide"]
-            train_data_long = feature_dict["original_data_train_long"]
-            test_data_long = feature_dict["original_data_test_long"]
-            original_data_long = feature_dict["original_data_long"]
-            original_mask = feature_dict["mask_original_wide"]
-            original_data_no_transf_long = feature_dict["original_data_no_transf_long"]
-            test_data_no_transf_long = feature_dict["original_data_test_no_transf_long"]
-            test_dyn_features = feature_dict["fourier_features_test"]
-            original_dyn_features = feature_dict["fourier_features_original"]
-
             data_mask_temporalized = TemporalizeGenerator(
-                original_data,
-                original_mask,
-                original_dyn_features,
+                create_dataset_vae.original_wide_transf,
+                create_dataset_vae.mask_wide,
+                create_dataset_vae.original_dyn_features,
                 window_size=create_dataset_vae.best_params["window_size"],
                 batch_size=create_dataset_vae.best_params["batch_size"],
                 shuffle=create_dataset_vae.best_params["shuffle"],
             )
 
-            _, synth_hitgen_test_long, _, _, synth_hitgen_test_long_no_transf, _ = (
-                create_dataset_vae.predict(
-                    model,
-                    data_mask_temporalized=data_mask_temporalized,
-                )
+            (
+                _,
+                synth_hitgen_test_long,
+                _,
+            ) = create_dataset_vae.predict(
+                model,
+                data_mask_temporalized=data_mask_temporalized,
             )
-
-            # generate more samples into the future to check on overfitting
-            # new_latent_samples = np.random.normal(
-            #     size=(
-            #         data_mask_temporalized.indices.shape[0] + WINDOW_SIZE,
-            #         WINDOW_SIZE,
-            #         LATENT_DIM,
-            #     )
-            # )
-            # n_series = data.shape[1]
-            # future_mask = tf.ones((WINDOW_SIZE, n_series), dtype=tf.float32)
-            #
-            # mask = tf.concat([create_dataset_vae.mask, future_mask], axis=0)
-            # mask_temporalized = create_dataset_vae.temporalize(mask, WINDOW_SIZE)
-            # generated_data = model.decoder.predict([new_latent_samples, mask_temporalized])
-            #
-            # synth_hitgen = detemporalize(generated_data)
-
-            # import matplotlib.pyplot as plt
-            #
-            # unique_ids = synth_hitgen_test_long["unique_id"].unique()[:4]
-            #
-            # fig, axes = plt.subplots(4, 1, figsize=(12, 16), sharex=True)
-            # for idx, unique_id in enumerate(unique_ids):
-            #     ax = axes[idx]
-            #     original_series = original_data_long[
-            #         original_data_long["unique_id"] == unique_id
-            #     ]
-            #     synthetic_series = synth_hitgen_test_long[
-            #         synth_hitgen_test_long["unique_id"] == unique_id
-            #     ]
-            #
-            #     ax.plot(
-            #         original_series["ds"],
-            #         original_series["y"],
-            #         label="Original",
-            #         linestyle="-",
-            #     )
-            #     ax.plot(
-            #         synthetic_series["ds"],
-            #         synthetic_series["y"],
-            #         label="Synthetic",
-            #         linestyle="--",
-            #     )
-            #
-            #     ax.set_title(f"Time Series for ID: {unique_id}")
-            #     ax.set_ylabel("Value")
-            #     ax.legend()
-            #     ax.grid()
-            #
-            # plt.xlabel("Time Steps")
-            # plt.tight_layout()
-            # plt.show()
 
             # TimeGAN synthetic data generation
 
@@ -393,7 +321,9 @@ if __name__ == "__main__":
             #     test_data_long, best_params, DATASET, DATASET_GROUP, window_size=24
             # )
 
-            test_unique_ids = test_data_no_transf_long["unique_id"].unique()
+            test_unique_ids = create_dataset_vae.original_test_long[
+                "unique_id"
+            ].unique()
 
             # hypertuning timegan
             # hyper_tune_timegan(
@@ -419,19 +349,15 @@ if __name__ == "__main__":
 
             # metaforecast methods
             synthetic_metaforecast_long_no_transf = workflow_metaforecast_methods(
-                df=original_data_no_transf_long.dropna(),
+                df=create_dataset_vae.original_long,
                 freq=FREQ,
                 dataset=DATASET,
                 dataset_group=DATASET_GROUP,
             )
 
-            synth_hitgen_test_long_no_transf = synth_hitgen_test_long_no_transf[
-                ~test_data_no_transf_long["y"].isna().values
-            ]
-
             plot_generated_vs_original(
-                synth_data=synth_hitgen_test_long_no_transf,
-                original_test_data=test_data_no_transf_long,
+                synth_data=synth_hitgen_test_long,
+                original_test_data=create_dataset_vae.original_test_long,
                 score=0.0,
                 loss=0.0,
                 dataset_name=DATASET,
@@ -444,8 +370,8 @@ if __name__ == "__main__":
                 print("\nComputing discriminative score for HiTGen synthetic data...")
                 hitgen_score_disc = compute_discriminative_score(
                     unique_ids=test_unique_ids,
-                    original_data=test_data_no_transf_long.dropna(subset=["y"]),
-                    synthetic_data=synth_hitgen_test_long_no_transf,
+                    original_data=create_dataset_vae.original_test_long,
+                    synthetic_data=synth_hitgen_test_long,
                     method="hitgen",
                     freq=FREQ,
                     dataset_name=DATASET,
@@ -458,8 +384,8 @@ if __name__ == "__main__":
             print("\nComputing TSTR score for HiTGen synthetic data...")
             hitgen_score_tstr = tstr(
                 unique_ids=test_unique_ids,
-                original_data=test_data_no_transf_long.dropna(subset=["y"]),
-                synthetic_data=synth_hitgen_test_long_no_transf,
+                original_data=create_dataset_vae.original_test_long,
+                synthetic_data=synth_hitgen_test_long,
                 method="hitgen",
                 freq=FREQ,
                 horizon=H,
@@ -474,8 +400,8 @@ if __name__ == "__main__":
             )
             hitgen_score_dtf = compute_downstream_forecast(
                 unique_ids=test_unique_ids,
-                original_data=test_data_no_transf_long.dropna(subset=["y"]),
-                synthetic_data=synth_hitgen_test_long_no_transf,
+                original_data=create_dataset_vae.original_test_long,
+                synthetic_data=synth_hitgen_test_long,
                 method="hitgen",
                 freq=FREQ,
                 horizon=H,
@@ -535,13 +461,13 @@ if __name__ == "__main__":
                 synthetic_metaforecast_long_no_transf_method = (
                     synthetic_metaforecast_long_no_transf.loc[
                         (synthetic_metaforecast_long_no_transf["method"] == method)
-                        & ~test_data_no_transf_long["y"].isna()
+                        & ~create_dataset_vae.original_test_long["y"].isna()
                     ].copy()
                 )
 
                 plot_generated_vs_original(
                     synth_data=synthetic_metaforecast_long_no_transf_method,
-                    original_test_data=test_data_no_transf_long.dropna(subset=["y"]),
+                    original_test_data=create_dataset_vae.original_test_long,
                     score=0.0,
                     loss=0.0,
                     dataset_name=DATASET,
@@ -556,7 +482,7 @@ if __name__ == "__main__":
 
                 score_disc = compute_discriminative_score(
                     unique_ids=test_unique_ids,
-                    original_data=test_data_no_transf_long.dropna(subset=["y"]),
+                    original_data=create_dataset_vae.original_test_long,
                     synthetic_data=synthetic_metaforecast_long_no_transf.loc[
                         synthetic_metaforecast_long_no_transf["method"] == method
                     ],
@@ -572,7 +498,7 @@ if __name__ == "__main__":
                 print(f"\nComputing TSTR score for {method} synthetic data...")
                 score_tstr = tstr(
                     unique_ids=test_unique_ids,
-                    original_data=test_data_no_transf_long.dropna(subset=["y"]),
+                    original_data=create_dataset_vae.original_test_long,
                     synthetic_data=synthetic_metaforecast_long_no_transf.loc[
                         synthetic_metaforecast_long_no_transf["method"] == method
                     ],
@@ -590,7 +516,7 @@ if __name__ == "__main__":
                 )
                 score_dtf = compute_downstream_forecast(
                     unique_ids=test_unique_ids,
-                    original_data=test_data_no_transf_long.dropna(subset=["y"]),
+                    original_data=create_dataset_vae.original_test_long,
                     synthetic_data=synthetic_metaforecast_long_no_transf.loc[
                         synthetic_metaforecast_long_no_transf["method"] == method
                     ],

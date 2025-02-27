@@ -745,8 +745,9 @@ def decoder(
         name="conv1_decoder_backcast_final",
     )(backcast_out)
 
+    # backcast_out = relu_saturation(backcast_out)
+    backcast_out = layers.Dense(num_features, activation="linear")(backcast_out)
     backcast_out = layers.Multiply(name="masked_output")([backcast_out, mask_input])
-    backcast_out = relu_saturation(backcast_out)
 
     # --- Forecasting Part ---
     if forecasting:
@@ -787,10 +788,12 @@ def decoder(
             name="conv1_decoder_forecast_final",
         )(forecast_out)
 
+        # forecast_out = relu_saturation(forecast_out)
+        forecast_out = layers.Dense(num_features, activation="linear")(forecast_out)
+
         forecast_out = layers.Multiply(name="masked_forecast_output")(
             [forecast_out, mask_input]
         )
-        forecast_out = relu_saturation(forecast_out)
 
     else:
         forecast_out = backcast_out
