@@ -166,7 +166,7 @@ class CreateTransformedVersionsCVAE:
             ds = data_cls.load_data(group)
 
             # for testing purposes only
-            ds = ds[ds["unique_id"].isin(ds["unique_id"].unique()[:20])]
+            # ds = ds[ds["unique_id"].isin(ds["unique_id"].unique()[:20])]
         except FileNotFoundError as e:
             print(f"Error loading data for {dataset_name} - {group}: {e}")
 
