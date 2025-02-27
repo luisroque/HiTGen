@@ -117,6 +117,20 @@ class CreateTransformedVersionsCVAE:
         self.split_path = f"assets/model_weights/data_split/{dataset_name}_{dataset_group}_data_split.json"
         self.unique_ids = self.df["unique_id"].unique()
 
+        # map each frequency string to (index_function, period)
+        self.freq_map = {
+            "D": (self._daily_index, 365.25),
+            "W": (self._weekly_index, 52.18),
+            "W-SUN": (self._weekly_index, 52.18),
+            "W-MON": (self._weekly_index, 52.18),
+            "M": (self._monthly_index, 12),
+            "MS": (self._monthly_index, 12),
+            "Q": (self._quarterly_index, 4),
+            "QS": (self._quarterly_index, 4),
+            "Y": (self._yearly_index, 1),
+            "YS": (self._yearly_index, 1),
+        }
+
         feature_dict = self._feature_engineering()
 
         self.original_wide = feature_dict["original_wide"]
@@ -343,6 +357,79 @@ class CreateTransformedVersionsCVAE:
         self.scaler_train = StandardScaler()
         scaled_data_train = self.scaler_train.fit_transform(x_wide_filled)
 
+    @staticmethod
+    def _monthly_index(dates: pd.DatetimeIndex) -> np.ndarray:
+        """
+        Convert each date to an integer that represents
+        the number of months since the first date
+        """
+        d0 = dates[0]
+        return (dates.year - d0.year) * 12 + (dates.month - d0.month)
+
+    @staticmethod
+    def _quarterly_index(dates: pd.DatetimeIndex) -> np.ndarray:
+        """
+        Convert each date to an integer that represents
+        the number of quarters since the first date
+        """
+        d0 = dates[0]
+        quarter = (dates.month - 1) // 3
+        quarter0 = (d0.month - 1) // 3
+        return (dates.year - d0.year) * 4 + (quarter - quarter0)
+
+    @staticmethod
+    def _yearly_index(dates: pd.DatetimeIndex) -> np.ndarray:
+        """
+        Convert each date to an integer that represents
+        the number of years since the first date
+        """
+        d0 = dates[0]
+        return dates.year - d0.year
+
+    @staticmethod
+    def _daily_index(dates: pd.DatetimeIndex) -> np.ndarray:
+        """
+        Convert each date to an integer that represents
+        the number of days since the first date
+        """
+        d0 = dates[0]
+        return (dates - d0).days
+
+    @staticmethod
+    def _weekly_index(dates: pd.DatetimeIndex) -> np.ndarray:
+        """
+        Convert each date to a float that represents
+        the number of weeks since the first date
+        """
+        d0 = dates[0]
+        # dividing days by 7 => fractional weeks
+        return (dates - d0).days / 7.0
+
+    def compute_fourier_features(self, dates, order=3) -> pd.DataFrame:
+        """
+        Compute sinusoidal (Fourier) terms for a given frequency.
+        """
+        dates = pd.to_datetime(dates)
+
+        try:
+            index_func, period = self.freq_map[self.freq]
+        except KeyError:
+            # for weekly, we might have something like "W-THU", so let's handle that generically:
+            if freq.startswith("W-"):
+                index_func, period = self._weekly_index, 52.18
+            else:
+                raise ValueError(f"Unsupported freq: {self.freq}")
+
+        t = index_func(dates).astype(float)
+
+        features = {}
+        for k in range(1, order + 1):
+            arg = 2.0 * np.pi * k * t / period
+            features[f"sin_{self.freq}_{k}"] = np.sin(arg)
+            features[f"cos_{self.freq}_{k}"] = np.cos(arg)
+
+        return pd.DataFrame(features, index=dates)
+
     def _feature_engineering(
         self, train_test_split=0.7, train_size_absolute=None
     ) -> Dict[str, pd.DataFrame]:
@@ -419,32 +506,9 @@ class CreateTransformedVersionsCVAE:
         self.X_test_raw = test_wide.reset_index(drop=True)
         self.X_orig_raw = original_wide.reset_index(drop=True)
 
-        def compute_fourier_features(dates, n):
-            """
-            Compute Fourier terms for a given frequency.
-            `self.freq` must be an attribute like 'D', 'W', 'M', etc.
-            """
-            t = dates.astype(np.int64) / 10**9
-            freq_to_period = {
-                "D": 365.25,
-                "W": 52.18,
-                "MS": 12,
-                "M": 12,
-                "QS": 4,
-                "Q": 4,
-                "Y": 1,
-                "YS": 1,
-            }
-            period = freq_to_period.get(self.freq, 1)
-            features = {}
-            for k in range(1, n + 1):
-                features[f"sin_{self.freq}_{k}"] = np.sin(2 * np.pi * k * t / period)
-                features[f"cos_{self.freq}_{k}"] = np.cos(2 * np.pi * k * t / period)
-            return pd.DataFrame(features, index=dates)
-
-        fourier_features_train = compute_fourier_features(train_wide.index, 3)
-        fourier_features_test = compute_fourier_features(test_wide.index, 3)
-        fourier_features_original = compute_fourier_features(original_wide.index, 3)
+        fourier_features_train = self.compute_fourier_features(train_wide.index)
+        fourier_features_test = self.compute_fourier_features(test_wide.index)
+        fourier_features_original = self.compute_fourier_features(original_wide.index)
 
         return {
             # wide
