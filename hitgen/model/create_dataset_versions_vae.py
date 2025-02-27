@@ -185,7 +185,7 @@ class CreateTransformedVersionsCVAE:
 
     @staticmethod
     def _create_dataset_wide_form(
-        data_long: pd.DataFrame, ids: List[str]
+        data_long: pd.DataFrame, ids: List[str], fill_nans: bool = True
     ) -> pd.DataFrame:
         """
         Transforms a long-form dataset back to wide form ensuring the
@@ -198,8 +198,9 @@ class CreateTransformedVersionsCVAE:
 
         data_long = data_long.sort_values(by=["unique_id", "ds"])
         data_wide = data_long.pivot(index="ds", columns="unique_id", values="y")
-        data_wide = data_wide.fillna(0)
         data_wide = data_wide.reindex(columns=ids)
+        if fill_nans:
+            data_wide = data_wide.fillna(0)
 
         return data_wide
 
@@ -320,7 +321,7 @@ class CreateTransformedVersionsCVAE:
         self, df: pd.DataFrame, ids: List[str]
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Sort and preprocess the data for feature engineering."""
-        x_wide = self._create_dataset_wide_form(df, ids)
+        x_wide = self._create_dataset_wide_form(df, ids, fill_nans=False)
 
         self.long_properties["ds"] = x_wide.reset_index()["ds"].values
         self.long_properties["unique_id"] = x_wide.columns.values
@@ -333,7 +334,7 @@ class CreateTransformedVersionsCVAE:
         self.scaler = StandardScaler()
         scaled_data = self.scaler.fit_transform(x_wide_filled)
 
-        return scaled_data, mask, x_wide
+        return scaled_data, mask, x_wide_filled
 
     def _set_scaler_train(self, df: pd.DataFrame):
         """Sort and preprocess the data for feature engineering."""
@@ -1085,7 +1086,7 @@ class CreateTransformedVersionsCVAE:
                 data_mask_temporalized.temporalized_dyn_features,
             ]
         )
-        alpha = 3  # x times bigger variance
+        alpha = 0  # x times bigger variance
         epsilon = np.random.normal(size=z_mean.shape) * 0.1
         z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
         generated_data, predictions = cvae.decoder.predict(

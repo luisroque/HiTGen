@@ -297,8 +297,8 @@ if __name__ == "__main__":
 
             (
                 _,
-                synth_hitgen_test_long,
                 _,
+                synth_hitgen_test_long,
             ) = create_dataset_vae.predict(
                 model,
                 data_mask_temporalized=data_mask_temporalized,
@@ -348,8 +348,8 @@ if __name__ == "__main__":
             # )
 
             # metaforecast methods
-            synthetic_metaforecast_long_no_transf = workflow_metaforecast_methods(
-                df=create_dataset_vae.original_long,
+            synthetic_metaforecast_long = workflow_metaforecast_methods(
+                df=create_dataset_vae.original_test_long,
                 freq=FREQ,
                 dataset=DATASET,
                 dataset_group=DATASET_GROUP,
@@ -362,8 +362,8 @@ if __name__ == "__main__":
                 loss=0.0,
                 dataset_name=DATASET,
                 dataset_group=DATASET_GROUP,
-                n_series=8,
-                suffix_name="hitgen_no_transf",
+                n_series=4,
+                suffix_name="hitgen",
             )
 
             if not hitgen_score_disc:
@@ -458,22 +458,28 @@ if __name__ == "__main__":
             # print(f"Discriminative score for TimeGAN synthetic data: {score_timegan:.4f}")
 
             for method in METAFORECAST_METHODS:
-                synthetic_metaforecast_long_no_transf_method = (
-                    synthetic_metaforecast_long_no_transf.loc[
-                        (synthetic_metaforecast_long_no_transf["method"] == method)
-                        & ~create_dataset_vae.original_test_long["y"].isna()
-                    ].copy()
+                synthetic_metaforecast_long_method = synthetic_metaforecast_long.loc[
+                    synthetic_metaforecast_long["method"] == method
+                ].copy()
+
+                synthetic_metaforecast_long_method = (
+                    synthetic_metaforecast_long_method.merge(
+                        create_dataset_vae.original_test_long[["unique_id", "ds"]],
+                        on=["unique_id", "ds"],
+                        how="right",
+                    )
                 )
+                synthetic_metaforecast_long_method.fillna(0, inplace=True)
 
                 plot_generated_vs_original(
-                    synth_data=synthetic_metaforecast_long_no_transf_method,
+                    synth_data=synthetic_metaforecast_long_method,
                     original_test_data=create_dataset_vae.original_test_long,
                     score=0.0,
                     loss=0.0,
                     dataset_name=DATASET,
                     dataset_group=DATASET_GROUP,
-                    n_series=8,
-                    suffix_name=f"{method}_no_transf",
+                    n_series=4,
+                    suffix_name=f"{method}",
                 )
 
                 print(
@@ -483,9 +489,7 @@ if __name__ == "__main__":
                 score_disc = compute_discriminative_score(
                     unique_ids=test_unique_ids,
                     original_data=create_dataset_vae.original_test_long,
-                    synthetic_data=synthetic_metaforecast_long_no_transf.loc[
-                        synthetic_metaforecast_long_no_transf["method"] == method
-                    ],
+                    synthetic_data=synthetic_metaforecast_long_method,
                     method=method,
                     freq=FREQ,
                     dataset_name=DATASET,
@@ -499,9 +503,7 @@ if __name__ == "__main__":
                 score_tstr = tstr(
                     unique_ids=test_unique_ids,
                     original_data=create_dataset_vae.original_test_long,
-                    synthetic_data=synthetic_metaforecast_long_no_transf.loc[
-                        synthetic_metaforecast_long_no_transf["method"] == method
-                    ],
+                    synthetic_data=synthetic_metaforecast_long_method,
                     method=method,
                     freq=FREQ,
                     horizon=H,
@@ -517,9 +519,7 @@ if __name__ == "__main__":
                 score_dtf = compute_downstream_forecast(
                     unique_ids=test_unique_ids,
                     original_data=create_dataset_vae.original_test_long,
-                    synthetic_data=synthetic_metaforecast_long_no_transf.loc[
-                        synthetic_metaforecast_long_no_transf["method"] == method
-                    ],
+                    synthetic_data=synthetic_metaforecast_long_method,
                     method=method,
                     freq=FREQ,
                     horizon=H,
