@@ -176,13 +176,14 @@ class CreateTransformedVersionsCVAE:
 
     def create_dataset_long_form(self, data, original, unique_ids=None) -> pd.DataFrame:
         df = pd.DataFrame(data)
+        df.sort_index(ascending=True, inplace=True)
 
         if unique_ids is None:
             df.columns = self.long_properties["unique_id"]
         else:
             df.columns = unique_ids
 
-        df.reset_index(inplace=True)
+        df["ds"] = self.long_properties["ds"]
 
         data_long = df.melt(id_vars=["ds"], var_name="unique_id", value_name="y")
         data_long = data_long.sort_values(by=["unique_id", "ds"])
@@ -209,6 +210,7 @@ class CreateTransformedVersionsCVAE:
 
         data_long = data_long.sort_values(by=["unique_id", "ds"])
         data_wide = data_long.pivot(index="ds", columns="unique_id", values="y")
+        data_wide = data_wide.sort_index(ascending=True)
         data_wide = data_wide.reindex(columns=ids)
         if fill_nans:
             data_wide = data_wide.fillna(0)
