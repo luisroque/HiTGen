@@ -41,35 +41,46 @@ def workflow_metaforecast_methods(
         "Methods used for this generation: DBA, Jitter, Scaling, MagWarp, TimeWarp, MBB, TSMixup"
     )
 
+    df.sort_values(by=["unique_id", "ds"], inplace=True)
+
+    df_unique_ids = df["unique_id"].unique()
+
     dba_synth = DBA(max_n_uids=10)
     df_dba = dba_synth.transform(df)
     df_dba["method"] = "DBA"
-    df_dba["unique_id"] = df["unique_id"]
+    id_mapping = dict(zip(df_dba["unique_id"].unique(), df_unique_ids))
+    df_dba["unique_id"] = df_dba["unique_id"].map(id_mapping)
 
     jitter_synth = Jittering()
     df_jitter = jitter_synth.transform(df)
     df_jitter["method"] = "Jitter"
-    df_jitter["unique_id"] = df["unique_id"]
+    id_mapping = dict(zip(df_jitter["unique_id"].unique(), df_unique_ids))
+    df_jitter["unique_id"] = df_jitter["unique_id"].map(id_mapping)
 
     scaling_synth = Scaling()
     df_scaling = scaling_synth.transform(df)
     df_scaling["method"] = "Scaling"
     df_scaling["unique_id"] = df["unique_id"]
+    id_mapping = dict(zip(df_scaling["unique_id"].unique(), df_unique_ids))
+    df_scaling["unique_id"] = df_scaling["unique_id"].map(id_mapping)
 
     magwarp_synth = MagnitudeWarping()
     df_magwarp = magwarp_synth.transform(df)
     df_magwarp["method"] = "MagWarp"
-    df_magwarp["unique_id"] = df["unique_id"]
+    id_mapping = dict(zip(df_magwarp["unique_id"].unique(), df_unique_ids))
+    df_magwarp["unique_id"] = df_magwarp["unique_id"].map(id_mapping)
 
     timewarp_synth = TimeWarping()
     df_timewarp = timewarp_synth.transform(df)
     df_timewarp["method"] = "TimeWarp"
-    df_timewarp["unique_id"] = df["unique_id"]
+    id_mapping = dict(zip(df_timewarp["unique_id"].unique(), df_unique_ids))
+    df_timewarp["unique_id"] = df_timewarp["unique_id"].map(id_mapping)
 
     mbb_synth = SeasonalMBB(seas_period=per)
     df_mbb = mbb_synth.transform(df)
     df_mbb["method"] = "MBB"
-    df_mbb["unique_id"] = df["unique_id"]
+    id_mapping = dict(zip(df_mbb["unique_id"].unique(), df_unique_ids))
+    df_mbb["unique_id"] = df_mbb["unique_id"].map(id_mapping)
 
     # TODO: TS_MIXUP NEEDS TO BE UPDATED TO CREATE SERIES WITH SIMILAR LENGTH AS THE ORIGINAL ONES
     # ts_mixup = TSMixup(max_n_uids=7, min_len=50, max_len=96)
