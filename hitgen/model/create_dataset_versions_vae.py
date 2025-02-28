@@ -181,11 +181,8 @@ class CreateTransformedVersionsCVAE:
             df.columns = self.long_properties["unique_id"]
         else:
             df.columns = unique_ids
-        df["ds"] = pd.date_range(
-            self.long_properties["ds"][0],
-            periods=data.shape[0],
-            freq=self.freq,
-        )
+
+        df.reset_index(inplace=True)
 
         data_long = df.melt(id_vars=["ds"], var_name="unique_id", value_name="y")
         data_long = data_long.sort_values(by=["unique_id", "ds"])
@@ -415,7 +412,7 @@ class CreateTransformedVersionsCVAE:
             index_func, period = self.freq_map[self.freq]
         except KeyError:
             # for weekly, we might have something like "W-THU", so let's handle that generically:
-            if freq.startswith("W-"):
+            if self.freq.startswith("W-"):
                 index_func, period = self._weekly_index, 52.18
             else:
                 raise ValueError(f"Unsupported freq: {self.freq}")
