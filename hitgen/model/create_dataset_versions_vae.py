@@ -197,7 +197,10 @@ class CreateTransformedVersionsCVAE:
 
     @staticmethod
     def _create_dataset_wide_form(
-        data_long: pd.DataFrame, ids: List[str], fill_nans: bool = True
+        data_long: pd.DataFrame,
+        ids: List[str],
+        full_dates: pd.DatetimeIndex,
+        fill_nans: bool = True,
     ) -> pd.DataFrame:
         """
         Transforms a long-form dataset back to wide form ensuring the
@@ -211,11 +214,34 @@ class CreateTransformedVersionsCVAE:
         data_long = data_long.sort_values(by=["unique_id", "ds"])
         data_wide = data_long.pivot(index="ds", columns="unique_id", values="y")
         data_wide = data_wide.sort_index(ascending=True)
-        data_wide = data_wide.reindex(columns=ids)
+        data_wide = data_wide.reindex(index=full_dates, columns=ids)
+        data_wide.index.name = "ds"
+
         if fill_nans:
             data_wide = data_wide.fillna(0)
 
         return data_wide
+
+    def check_series_in_train_test(
+        self,
+        date,
+        train_ids,
+        test_ids,
+    ):
+        series_to_check = self.df.loc[self.df["ds"] == date, "unique_id"].unique()
+
+        in_train = np.intersect1d(train_ids, series_to_check)
+
+        if len(in_train) == 0:
+            # none of the series is in train, move one in from test if possible
+            in_test = np.intersect1d(test_ids, series_to_check)
+            if len(in_test) > 0:
+                chosen = in_test[0]
+                # remove from test, add to train
+                test_ids = np.setdiff1d(test_ids, [chosen])
+                train_ids = np.append(train_ids, chosen)
+
+        return train_ids, test_ids
 
     def _load_or_create_split(
         self,
@@ -244,6 +270,18 @@ class CreateTransformedVersionsCVAE:
             json.dump(
                 {"train_ids": train_ids.tolist(), "test_ids": test_ids.tolist()}, f
             )
+
+        # ensuring that we have in the training set at least one series
+        # that starts with the min date
+        ds_min = self.long_properties["ds"].min()
+        ds_max = self.long_properties["ds"].max()
+
+        train_ids, test_ids = self.check_series_in_train_test(
+            ds_min, train_ids, test_ids
+        )
+        train_ids, test_ids = self.check_series_in_train_test(
+            ds_max, train_ids, test_ids
+        )
 
         return train_ids, test_ids
 
@@ -334,7 +372,14 @@ class CreateTransformedVersionsCVAE:
         self, df: pd.DataFrame, ids: List[str]
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Sort and preprocess the data for feature engineering."""
-        x_wide = self._create_dataset_wide_form(df, ids, fill_nans=False)
+        self.full_dates = pd.DatetimeIndex(sorted(df.ds.unique()))
+
+        x_wide = self._create_dataset_wide_form(
+            data_long=df,
+            ids=ids,
+            fill_nans=False,
+            full_dates=self.full_dates,
+        )
 
         self.long_properties["ds"] = x_wide.reset_index()["ds"].values
         self.long_properties["unique_id"] = x_wide.columns.values
@@ -464,12 +509,21 @@ class CreateTransformedVersionsCVAE:
         ]
 
         # convert training long -> wide
-        train_wide = self._create_dataset_wide_form(train_long, self.train_ids)
+        train_wide = self._create_dataset_wide_form(
+            data_long=train_long,
+            ids=self.train_ids,
+            full_dates=self.full_dates,
+        )
+
         train_wide_transf = self._create_dataset_wide_form(
-            train_long_transf, self.train_ids
+            data_long=train_long_transf,
+            ids=self.train_ids,
+            full_dates=self.full_dates,
         )
         mask_train_wide = self._create_dataset_wide_form(
-            mask_train_long, self.train_ids
+            data_long=mask_train_long,
+            ids=self.train_ids,
+            full_dates=self.full_dates,
         )
 
         # set training scaler
@@ -484,11 +538,21 @@ class CreateTransformedVersionsCVAE:
         ]
 
         # convert testing long -> wide
-        test_wide = self._create_dataset_wide_form(test_long, self.train_ids)
-        test_wide_transf = self._create_dataset_wide_form(
-            test_long_transf, self.train_ids
+        test_wide = self._create_dataset_wide_form(
+            data_long=test_long,
+            ids=self.train_ids,
+            full_dates=self.full_dates,
         )
-        mask_test_wide = self._create_dataset_wide_form(mask_test_long, self.train_ids)
+        test_wide_transf = self._create_dataset_wide_form(
+            data_long=test_long_transf,
+            ids=self.train_ids,
+            full_dates=self.full_dates,
+        )
+        mask_test_wide = self._create_dataset_wide_form(
+            data_long=mask_test_long,
+            ids=self.train_ids,
+            full_dates=self.full_dates,
+        )
 
         # convert mask to tensors
         self.mask_train_tf = tf.convert_to_tensor(
@@ -822,7 +886,7 @@ class CreateTransformedVersionsCVAE:
         kernel_size = trial.suggest_int("kernel_size", 2, 5)
         pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
         batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-        epochs = trial.suggest_int("epochs", 200, 2000, step=100)
+        epochs = trial.suggest_int("epochs", 2, 3, step=1)
         learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
         # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
         # forecasting = trial.suggest_categorical("forecasting", [True, False])
@@ -1203,7 +1267,7 @@ class CreateTransformedVersionsCVAE:
         X_hat = self.scaler_train.inverse_transform(X_hat_transf)
 
         x_hat_train_long = self.create_dataset_long_form(
-            X_hat, self.original_train_long, self.train_ids
+            X_hat, self.original_long, self.train_ids
         )
 
         return x_hat_train_long
