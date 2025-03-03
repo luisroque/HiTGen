@@ -611,8 +611,10 @@ def compute_downstream_forecast(
         "results_concatenated_samples": results_concatenated,
     }
 
-    with open(results_file, "w") as f:
-        json.dump(final_results, f)
-        print(f"Results saved to '{results_file}'")
-
-    return final_results
+    if split == "hypertuning":
+        return avg_smape_concat
+    else:
+        with open(results_file, "w") as f:
+            json.dump(final_results, f)
+            print(f"Results saved to '{results_file}'")
+        return final_results

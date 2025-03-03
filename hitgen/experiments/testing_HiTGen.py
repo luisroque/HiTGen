@@ -233,6 +233,13 @@ if __name__ == "__main__":
         action="store_true",
         help="Use GPU if available (default: False, meaning it runs on CPU).",
     )
+    parser.add_argument(
+        "--opt-score",
+        choices=["discriminative_score", "downstream_score"],
+        default="discriminative_score",
+        help="Select the score for the hyperparameter tuning optimization. Choices: "
+        "'discriminative_score' or 'downstream_score' (default: 'discriminative_score').",
+    )
     args = parser.parse_args()
 
     set_device(args.use_gpu)
@@ -281,6 +288,8 @@ if __name__ == "__main__":
                 dataset_name=DATASET,
                 dataset_group=DATASET_GROUP,
                 freq=FREQ,
+                horizon=H,
+                opt_score=args.opt_score,
             )
 
             # hypertuning

@@ -19,6 +19,7 @@ from hitgen.feature_engineering.feature_transformations import (
 from hitgen.model.models import get_CVAE
 from hitgen.metrics.discriminative_score import (
     compute_discriminative_score,
+    compute_downstream_forecast,
 )
 from hitgen.load_data.config import DATASETS
 from hitgen.visualization.model_visualization import (
@@ -71,6 +72,8 @@ class CreateTransformedVersionsCVAE:
         kernel_size: int = 2,
         pooling_mode: str = "average",
         patience: int = 30,
+        horizon: int = 24,
+        opt_score: str = "discriminative_score",
     ):
         self.dataset_name = dataset_name
         self.dataset_group = dataset_group
@@ -104,6 +107,8 @@ class CreateTransformedVersionsCVAE:
         self.n = self.data.shape[0]
         self.df = pd.DataFrame(self.data)
         self.df.asfreq(self.freq)
+        self.h = horizon
+        self.opt_score = opt_score
 
         num_series = self.df["unique_id"].nunique()
         avg_time_points = self.df.groupby("unique_id").size().mean()
@@ -789,7 +794,7 @@ class CreateTransformedVersionsCVAE:
             "kernel_size_forecast": kernel_size_forecast,
             "noise_scale_init": noise_scale_init,
             "loss": loss,
-            "score": score,
+            self.opt_score: score,
         }
 
         added_score = False
@@ -800,7 +805,7 @@ class CreateTransformedVersionsCVAE:
             added_score = True
 
         # if the list is full, add only if the score is better than the worst
-        elif score < max([entry["score"] for entry in scores_data]):
+        elif score < max([entry[self.opt_score] for entry in scores_data]):
             scores_data.append(new_score)
             added_score = True
 
@@ -815,7 +820,7 @@ class CreateTransformedVersionsCVAE:
                 n_series=8,
             )
 
-        scores_data.sort(key=lambda x: x["score"])
+        scores_data.sort(key=lambda x: x[self.opt_score])
         scores_data = scores_data[:20]
 
         os.makedirs(os.path.dirname(scores_path), exist_ok=True)
@@ -973,22 +978,34 @@ class CreateTransformedVersionsCVAE:
             data_mask_temporalized=data_mask_temporalized,
         )
 
-        # compute the discriminative score x times to account for variability
-
-        score = self.compute_mean_discriminative_score(
-            unique_ids=self.original_long["unique_id"].unique(),
-            original_data=self.original_long,
-            synthetic_data=synthetic_long,
-            method="hitgen",
-            freq="M",
-            dataset_name=self.dataset_name,
-            dataset_group=self.dataset_group,
-            loss=loss,
-            generate_feature_plot=False,
-            store_score=False,
-            store_features_synth=False,
-            split="hypertuning",
-        )
+        if self.opt_score == "discriminative_score":
+            score = self.compute_mean_discriminative_score(
+                unique_ids=self.original_long["unique_id"].unique(),
+                original_data=self.original_long,
+                synthetic_data=synthetic_long,
+                method="hitgen",
+                freq=self.freq,
+                dataset_name=self.dataset_name,
+                dataset_group=self.dataset_group,
+                loss=loss,
+                generate_feature_plot=False,
+                store_score=False,
+                store_features_synth=False,
+                split="hypertuning",
+            )
+        else:
+            score = compute_downstream_forecast(
+                unique_ids=self.original_long["unique_id"].unique(),
+                original_data=self.original_long,
+                synthetic_data=synthetic_long,
+                method="hitgen",
+                freq=self.freq,
+                horizon=self.h,
+                dataset_name=self.dataset_name,
+                dataset_group=self.dataset_group,
+                samples=5,
+                split="hypertuning",
+            )
 
         if score is None:
             print("No valid scores computed. Pruning this trial.")
@@ -1035,7 +1052,7 @@ class CreateTransformedVersionsCVAE:
         #     print(f"Error in trial: {e}")
         #     raise optuna.exceptions.TrialPruned()
 
-    def hyper_tune_and_train(self, n_trials=75):
+    def hyper_tune_and_train(self, n_trials=100):
         """
         Run Optuna hyperparameter tuning for the CVAE and train the best model.
         """
