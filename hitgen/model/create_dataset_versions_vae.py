@@ -9,7 +9,7 @@ import optuna
 from tensorflow import keras
 import tensorflow as tf
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from hitgen.model.models import CVAE
+from hitgen.model.models import CVAE, TemporalizeGenerator
 from hitgen.feature_engineering.feature_transformations import (
     detemporalize,
 )
@@ -602,79 +602,6 @@ class CreateTransformedVersionsCVAE:
             "fourier_features_original": fourier_features_original,
         }
 
-    @staticmethod
-    def make_windowed_dataset(
-        data: np.ndarray,
-        mask: np.ndarray,
-        dyn_features: np.ndarray,
-        window_size: int,
-        stride: int = 1,
-    ):
-        """
-        Create inputs/targets for a one-step-ahead forecast, where:
-          - X[i] = data[i : i+window_size]
-          - y[i] = data[i+1 : i+1+window_size] (the *next* window)
-        """
-        all_X, all_M, all_D = [], [], []
-        all_y = []
-
-        total_timesteps = data.shape[0]
-        for start_idx in range(0, total_timesteps - window_size, stride):
-            input_window_end = start_idx + window_size
-            next_window_start = start_idx + 1
-            next_window_end = start_idx + 1 + window_size
-
-            # guard in case we exceed the boundary
-            if next_window_end > total_timesteps:
-                break
-
-            # collect the input slices
-            X_slice = data[start_idx:input_window_end]  # [window_size, n_series]
-            M_slice = mask[start_idx:input_window_end]
-            D_slice = dyn_features[start_idx:input_window_end]
-
-            # target is the next window
-            y_slice = data[next_window_start:next_window_end]
-
-            all_X.append(X_slice)
-            all_M.append(M_slice)
-            all_D.append(D_slice)
-            all_y.append(y_slice)
-
-        all_X = np.array(all_X, dtype=np.float32)
-        all_M = np.array(all_M, dtype=np.float32)
-        all_D = np.array(all_D, dtype=np.float32)
-        all_y = np.array(all_y, dtype=np.float32)
-
-        print("Created windowed dataset shapes:")
-        print(
-            "X:", all_X.shape, "M:", all_M.shape, "D:", all_D.shape, "y:", all_y.shape
-        )
-        return all_X, all_M, all_D, all_y
-
-    def create_tf_dataset(
-        self,
-        data: np.ndarray,
-        mask: np.ndarray,
-        dyn_features: np.ndarray,
-        window_size: int,
-        batch_size: int,
-    ):
-        """
-        Wrap the windowed arrays into a tf.data.Dataset of
-        ((batch_data, batch_mask, batch_dyn_features), batch_target).
-        """
-        X, M, D, y = self.make_windowed_dataset(
-            data=data,
-            mask=mask,
-            dyn_features=dyn_features,
-            window_size=window_size,
-            stride=1,
-        )
-        ds = tf.data.Dataset.from_tensor_slices(((X, M, D), y))
-        ds = ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
-        return ds
-
     def fit(
         self,
         window_size: int,
@@ -687,12 +614,13 @@ class CreateTransformedVersionsCVAE:
     ) -> tuple[CVAE, dict, EarlyStopping]:
         """Training our CVAE"""
 
-        data_mask_temporalized = self.create_tf_dataset(
+        data_mask_temporalized = TemporalizeGenerator(
             self.original_wide_transf,
             self.mask_wide,
             self.original_dyn_features,
             window_size=window_size,
             batch_size=self.batch_size,
+            shuffle=self.shuffle,
         )
 
         encoder, decoder = get_CVAE(
@@ -960,7 +888,7 @@ class CreateTransformedVersionsCVAE:
             kernel_size = trial.suggest_int("kernel_size", 2, 5)
             pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
             batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-            epochs = trial.suggest_int("epochs", 200, 2000, step=100)
+            epochs = trial.suggest_int("epochs", 5, 10, step=5)
             learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
             # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
             # forecasting = trial.suggest_categorical("forecasting", [True, False])
@@ -985,12 +913,13 @@ class CreateTransformedVersionsCVAE:
             shuffle = False
             forecasting = True
 
-            data_mask_temporalized = self.create_tf_dataset(
+            data_mask_temporalized = TemporalizeGenerator(
                 self.original_train_wide_transf,
                 self.mask_train_wide,
                 self.train_dyn_features,
                 window_size=window_size,
                 batch_size=batch_size,
+                shuffle=shuffle,
             )
 
             encoder, decoder = get_CVAE(
@@ -1202,12 +1131,13 @@ class CreateTransformedVersionsCVAE:
 
         print(f"Best Hyperparameters: {self.best_params}")
 
-        data_mask_temporalized = self.create_tf_dataset(
+        data_mask_temporalized = TemporalizeGenerator(
             self.original_wide_transf,
             self.mask_wide,
             self.original_dyn_features,
             window_size=self.best_params["window_size"],
             batch_size=self.best_params["batch_size"],
+            shuffle=self.best_params["shuffle"],
         )
 
         encoder, decoder = get_CVAE(
@@ -1330,24 +1260,23 @@ class CreateTransformedVersionsCVAE:
     ]:
         """Predict original time series using VAE"""
 
-        generated_data_list = []
-
-        # for each batch, run encoder -> sample -> decoder
-        for (X_batch, M_batch, D_batch), _ in data_mask_temporalized:
-            z_mean_batch, z_log_var_batch, _ = cvae.encoder([X_batch, M_batch, D_batch])
-
-            alpha = 3.0
-            epsilon = np.random.normal(size=z_mean_batch.shape) * 0.1
-            z_augmented_batch = (
-                    z_mean_batch
-                    + tf.exp(0.5 * z_log_var_batch) * alpha * epsilon
-            )
-
-            gen_data_batch, _ = cvae.decoder([z_augmented_batch, M_batch, D_batch])
-            generated_data_list.append(gen_data_batch.numpy())
-
-        # concatenate all windows across batches:
-        generated_data = np.concatenate(generated_data_list, axis=0)
+        z_mean, z_log_var, z = cvae.encoder.predict(
+            [
+                data_mask_temporalized.temporalized_data,
+                data_mask_temporalized.temporalized_mask,
+                data_mask_temporalized.temporalized_dyn_features,
+            ]
+        )
+        alpha = 3  # x times bigger variance
+        epsilon = np.random.normal(size=z_mean.shape) * 0.1
+        z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
+        generated_data, predictions = cvae.decoder.predict(
+            [
+                z_augmented,
+                data_mask_temporalized.temporalized_mask,
+                data_mask_temporalized.temporalized_dyn_features,
+            ]
+        )
 
         X_hat_wide_transf = detemporalize(generated_data)
         X_hat_wide = self.scaler.inverse_transform(X_hat_wide_transf)
@@ -1370,24 +1299,23 @@ class CreateTransformedVersionsCVAE:
     ) -> pd.DataFrame:
         """Predict original time series using VAE"""
 
-        generated_data_list = []
-
-        # for each batch, run encoder -> sample -> decoder
-        for (X_batch, M_batch, D_batch), _ in data_mask_temporalized:
-            z_mean_batch, z_log_var_batch, _ = cvae.encoder([X_batch, M_batch, D_batch])
-
-            alpha = 3.0
-            epsilon = np.random.normal(size=z_mean_batch.shape) * 0.1
-            z_augmented_batch = (
-                    z_mean_batch
-                    + tf.exp(0.5 * z_log_var_batch) * alpha * epsilon
-            )
-
-            gen_data_batch, _ = cvae.decoder([z_augmented_batch, M_batch, D_batch])
-            generated_data_list.append(gen_data_batch.numpy())
-
-        # concatenate all windows across batches:
-        generated_data = np.concatenate(generated_data_list, axis=0)
+        z_mean, z_log_var, z = cvae.encoder.predict(
+            [
+                data_mask_temporalized.temporalized_data,
+                data_mask_temporalized.temporalized_mask,
+                data_mask_temporalized.temporalized_dyn_features,
+            ]
+        )
+        alpha = 3  # x times bigger variance
+        epsilon = np.random.normal(size=z_mean.shape) * 0.1
+        z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
+        generated_data, predictions = cvae.decoder.predict(
+            [
+                z_augmented,
+                data_mask_temporalized.temporalized_mask,
+                data_mask_temporalized.temporalized_dyn_features,
+            ]
+        )
 
         X_hat_transf = detemporalize(generated_data)
         X_hat = self.scaler_train.inverse_transform(X_hat_transf)
