@@ -9,10 +9,7 @@ import optuna
 from tensorflow import keras
 import tensorflow as tf
 from keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from hitgen.model.models import (
-    CVAE,
-    TemporalizeGenerator,
-)
+from hitgen.model.models import CVAE
 from hitgen.feature_engineering.feature_transformations import (
     detemporalize,
 )
