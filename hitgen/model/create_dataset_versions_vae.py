@@ -1009,7 +1009,7 @@ class CreateTransformedVersionsCVAE:
                     horizon=self.h,
                     dataset_name=self.dataset_name,
                     dataset_group=self.dataset_group,
-                    samples=5,
+                    samples=10,
                     split="hypertuning",
                 )
 
@@ -1089,10 +1089,6 @@ class CreateTransformedVersionsCVAE:
         if len(study.trials) == 0 and not os.path.exists(weights_file):
             print("No trials have been completed yet. Running hyperparameter tuning...")
             study.optimize(self.objective, n_trials=n_trials)
-        else:
-            print(
-                "Since the model exists and can be loaded, hypertuning is being skipped...."
-            )
 
         try:
             best_trial = study.best_trial
@@ -1109,7 +1105,7 @@ class CreateTransformedVersionsCVAE:
                         print("Best params file found. Loading...")
                 except (FileNotFoundError, json.JSONDecodeError):
                     print(
-                        "Error loading best parameters file. Proceeding with optimization..."
+                        f"Error loading best parameters file {best_params_file}. Proceeding with optimization..."
                     )
                     study.optimize(self.objective, n_trials=n_trials)
                     best_trial = study.best_trial

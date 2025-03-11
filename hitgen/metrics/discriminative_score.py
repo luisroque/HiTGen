@@ -596,17 +596,28 @@ def compute_downstream_forecast(
     if results_original and results_concatenated:
         avg_smape_original = np.mean(results_original)
         avg_smape_concat = np.mean(results_concatenated)
+        std_smape_original = np.std(results_original)
+        std_smape_concat = np.std(results_concatenated)
+
         print("\n\n### Final Results across samples ###")
-        print(f"Avg SMAPE (original-only): {avg_smape_original:.4f}")
-        print(f"Avg SMAPE (concat):        {avg_smape_concat:.4f}")
+        print(
+            f"Avg SMAPE (original-only): {avg_smape_original:.4f} ± {std_smape_original:.4f}"
+        )
+        print(
+            f"Avg SMAPE (concat):        {avg_smape_concat:.4f} ± {std_smape_concat:.4f}"
+        )
     else:
         avg_smape_original = None
         avg_smape_concat = None
+        std_smape_original = None
+        std_smape_concat = None
         print("No valid iterations completed. Final results are undefined.")
 
     final_results = {
         "avg_smape_original": avg_smape_original,
+        "std_smape_original": std_smape_original,
         "avg_smape_concat": avg_smape_concat,
+        "std_smape_concat": std_smape_concat,
         "results_original_samples": results_original,
         "results_concatenated_samples": results_concatenated,
     }

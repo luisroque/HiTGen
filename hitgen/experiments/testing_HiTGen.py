@@ -2,7 +2,10 @@ import multiprocessing
 import os
 import argparse
 import pandas as pd
-from hitgen.model.create_dataset_versions_vae import CreateTransformedVersionsCVAE
+from hitgen.model.create_dataset_versions_vae import (
+    CreateTransformedVersionsCVAE,
+    TemporalizeGenerator,
+)
 from hitgen.metrics.discriminative_score import (
     compute_discriminative_score,
     compute_downstream_forecast,
@@ -161,17 +164,17 @@ DATASETS_HYPERPARAMS_CONFIGS = {
 }
 
 DATASET_GROUP_FREQ = {
-    # "Tourism": {
-    #     "Monthly": {"FREQ": "M", "H": 24},
-    # },
-    # "M1": {
-    #     "Monthly": {"FREQ": "M", "H": 24},
-    #     "Quarterly": {"FREQ": "Q", "H": 8},
-    # },
+    "Tourism": {
+        "Monthly": {"FREQ": "M", "H": 24},
+    },
+    "M1": {
+        "Monthly": {"FREQ": "M", "H": 24},
+        "Quarterly": {"FREQ": "Q", "H": 8},
+    },
     "M3": {
         "Monthly": {"FREQ": "M", "H": 24},
-        # "Quarterly": {"FREQ": "Q", "H": 8},
-        # "Yearly": {"FREQ": "Y", "H": 4},
+        "Quarterly": {"FREQ": "Q", "H": 8},
+        "Yearly": {"FREQ": "Y", "H": 4},
     },
 }
 
@@ -292,12 +295,13 @@ if __name__ == "__main__":
             # hypertuning
             model = create_dataset_vae.hyper_tune_and_train()
 
-            data_mask_temporalized = create_dataset_vae.create_tf_dataset(
+            data_mask_temporalized = TemporalizeGenerator(
                 create_dataset_vae.original_wide_transf,
                 create_dataset_vae.mask_wide,
                 create_dataset_vae.original_dyn_features,
                 window_size=create_dataset_vae.best_params["window_size"],
                 batch_size=create_dataset_vae.best_params["batch_size"],
+                shuffle=create_dataset_vae.best_params["shuffle"],
             )
 
             (
@@ -412,7 +416,7 @@ if __name__ == "__main__":
                 horizon=H,
                 dataset_name=DATASET,
                 dataset_group=DATASET_GROUP,
-                samples=5,
+                samples=10,
                 split="test",
             )
 
@@ -431,8 +435,10 @@ if __name__ == "__main__":
 
             print(
                 f"Downstream task forecasting score for HiTGen synthetic data: "
-                f"concat score {hitgen_score_dtf['avg_smape_concat']:.4f} vs original "
+                f"concat avg score {hitgen_score_dtf['avg_smape_concat']:.4f} vs original "
                 f"score {hitgen_score_dtf['avg_smape_original']:.4f}\n\n"
+                f"concat std score {hitgen_score_dtf['std_smape_concat']:.4f} vs original "
+                f"score {hitgen_score_dtf['std_smape_original']:.4f}\n\n"
             )
 
             results.append(
@@ -443,8 +449,10 @@ if __name__ == "__main__":
                     "Discriminative Score": hitgen_score_disc,
                     "TSTR (avg_smape_tstr)": hitgen_score_tstr["avg_smape_tstr"],
                     "TRTR (avg_smape_trtr)": hitgen_score_tstr["avg_smape_trtr"],
-                    "DTF Concat Score": hitgen_score_dtf["avg_smape_concat"],
-                    "DTF Original Score": hitgen_score_dtf["avg_smape_original"],
+                    "DTF Concat Avg Score": hitgen_score_dtf["avg_smape_concat"],
+                    "DTF Original Avg Score": hitgen_score_dtf["avg_smape_original"],
+                    "DTF Concat Std Score": hitgen_score_dtf["std_smape_concat"],
+                    "DTF Original Std Score": hitgen_score_dtf["std_smape_original"],
                 }
             )
 
@@ -530,7 +538,7 @@ if __name__ == "__main__":
                     horizon=H,
                     dataset_name=DATASET,
                     dataset_group=DATASET_GROUP,
-                    samples=5,
+                    samples=10,
                     split="test",
                 )
 
@@ -551,6 +559,8 @@ if __name__ == "__main__":
                     f"Downstream task forecasting score for {method} synthetic data: "
                     f"concat score {score_dtf['avg_smape_concat']:.4f} vs original "
                     f"score {score_dtf['avg_smape_original']:.4f}\n\n"
+                    f"concat std score {score_dtf['std_smape_concat']:.4f} vs original "
+                    f"score {score_dtf['std_smape_original']:.4f}\n\n"
                 )
 
                 results.append(
@@ -558,11 +568,13 @@ if __name__ == "__main__":
                         "Dataset": DATASET,
                         "Group": DATASET_GROUP,
                         "Method": method,
-                        "Discriminative Score": round(score_disc, 3),
-                        "TSTR (avg_smape_tstr)": round(score_tstr["avg_smape_tstr"], 3),
-                        "TRTR (avg_smape_trtr)": round(score_tstr["avg_smape_trtr"], 3),
-                        "DTF Concat Score": round(score_dtf["avg_smape_concat"], 3),
-                        "DTF Original Score": round(score_dtf["avg_smape_original"], 3),
+                        "Discriminative Score": score_disc,
+                        "TSTR (avg_smape_tstr)": score_tstr["avg_smape_tstr"],
+                        "TRTR (avg_smape_trtr)": score_tstr["avg_smape_trtr"],
+                        "DTF Concat Avg Score": score_dtf["avg_smape_concat"],
+                        "DTF Original Avg Score": score_dtf["avg_smape_original"],
+                        "DTF Concat Std Score": score_dtf["std_smape_concat"],
+                        "DTF Original Std Score": score_dtf["std_smape_original"],
                     }
                 )
 
