@@ -2,9 +2,6 @@ import multiprocessing
 import os
 import argparse
 import pandas as pd
-from hitgen.model.models import (
-    TemporalizeGenerator,
-)
 from hitgen.model.create_dataset_versions_vae import CreateTransformedVersionsCVAE
 from hitgen.metrics.discriminative_score import (
     compute_discriminative_score,
@@ -295,13 +292,12 @@ if __name__ == "__main__":
             # hypertuning
             model = create_dataset_vae.hyper_tune_and_train()
 
-            data_mask_temporalized = TemporalizeGenerator(
+            data_mask_temporalized = create_dataset_vae.create_tf_dataset(
                 create_dataset_vae.original_wide_transf,
                 create_dataset_vae.mask_wide,
                 create_dataset_vae.original_dyn_features,
                 window_size=create_dataset_vae.best_params["window_size"],
                 batch_size=create_dataset_vae.best_params["batch_size"],
-                shuffle=create_dataset_vae.best_params["shuffle"],
             )
 
             (

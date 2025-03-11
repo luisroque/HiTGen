@@ -1330,23 +1330,24 @@ class CreateTransformedVersionsCVAE:
     ]:
         """Predict original time series using VAE"""
 
-        z_mean, z_log_var, z = cvae.encoder.predict(
-            [
-                data_mask_temporalized.temporalized_data,
-                data_mask_temporalized.temporalized_mask,
-                data_mask_temporalized.temporalized_dyn_features,
-            ]
-        )
-        alpha = 3  # x times bigger variance
-        epsilon = np.random.normal(size=z_mean.shape) * 0.1
-        z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
-        generated_data, predictions = cvae.decoder.predict(
-            [
-                z_augmented,
-                data_mask_temporalized.temporalized_mask,
-                data_mask_temporalized.temporalized_dyn_features,
-            ]
-        )
+        generated_data_list = []
+
+        # for each batch, run encoder -> sample -> decoder
+        for (X_batch, M_batch, D_batch), _ in data_mask_temporalized:
+            z_mean_batch, z_log_var_batch, _ = cvae.encoder([X_batch, M_batch, D_batch])
+
+            alpha = 3.0
+            epsilon = np.random.normal(size=z_mean_batch.shape) * 0.1
+            z_augmented_batch = (
+                    z_mean_batch
+                    + tf.exp(0.5 * z_log_var_batch) * alpha * epsilon
+            )
+
+            gen_data_batch, _ = cvae.decoder([z_augmented_batch, M_batch, D_batch])
+            generated_data_list.append(gen_data_batch.numpy())
+
+        # concatenate all windows across batches:
+        generated_data = np.concatenate(generated_data_list, axis=0)
 
         X_hat_wide_transf = detemporalize(generated_data)
         X_hat_wide = self.scaler.inverse_transform(X_hat_wide_transf)
@@ -1369,23 +1370,24 @@ class CreateTransformedVersionsCVAE:
     ) -> pd.DataFrame:
         """Predict original time series using VAE"""
 
-        z_mean, z_log_var, z = cvae.encoder.predict(
-            [
-                data_mask_temporalized.temporalized_data,
-                data_mask_temporalized.temporalized_mask,
-                data_mask_temporalized.temporalized_dyn_features,
-            ]
-        )
-        alpha = 3  # x times bigger variance
-        epsilon = np.random.normal(size=z_mean.shape) * 0.1
-        z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
-        generated_data, predictions = cvae.decoder.predict(
-            [
-                z_augmented,
-                data_mask_temporalized.temporalized_mask,
-                data_mask_temporalized.temporalized_dyn_features,
-            ]
-        )
+        generated_data_list = []
+
+        # for each batch, run encoder -> sample -> decoder
+        for (X_batch, M_batch, D_batch), _ in data_mask_temporalized:
+            z_mean_batch, z_log_var_batch, _ = cvae.encoder([X_batch, M_batch, D_batch])
+
+            alpha = 3.0
+            epsilon = np.random.normal(size=z_mean_batch.shape) * 0.1
+            z_augmented_batch = (
+                    z_mean_batch
+                    + tf.exp(0.5 * z_log_var_batch) * alpha * epsilon
+            )
+
+            gen_data_batch, _ = cvae.decoder([z_augmented_batch, M_batch, D_batch])
+            generated_data_list.append(gen_data_batch.numpy())
+
+        # concatenate all windows across batches:
+        generated_data = np.concatenate(generated_data_list, axis=0)
 
         X_hat_transf = detemporalize(generated_data)
         X_hat = self.scaler_train.inverse_transform(X_hat_transf)
