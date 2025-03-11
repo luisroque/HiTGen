@@ -901,12 +901,16 @@ class CreateTransformedVersionsCVAE:
                 "conv1d_blocks_backcast", 1, 5, step=1
             )
             filters_backcast = trial.suggest_int("filters_backcast", 16, 256, step=16)
-            kernel_size_backcast = trial.suggest_int("kernel_size_backcast", 2, 4, step=1)
+            kernel_size_backcast = trial.suggest_int(
+                "kernel_size_backcast", 2, 4, step=1
+            )
             conv1d_blocks_forecast = trial.suggest_int(
                 "conv1d_blocks_forecast", 1, 5, step=1
             )
             filters_forecast = trial.suggest_int("filters_forecast", 16, 256, step=16)
-            kernel_size_forecast = trial.suggest_int("kernel_size_forecast", 2, 4, step=1)
+            kernel_size_forecast = trial.suggest_int(
+                "kernel_size_forecast", 2, 4, step=1
+            )
 
             bi_rnn = False
             shuffle = False
@@ -960,7 +964,12 @@ class CreateTransformedVersionsCVAE:
                 restore_best_weights=True,
             )
             reduce_lr = ReduceLROnPlateau(
-                monitor="loss", factor=0.2, patience=10, min_lr=1e-6, cooldown=3, verbose=1
+                monitor="loss",
+                factor=0.2,
+                patience=10,
+                min_lr=1e-6,
+                cooldown=3,
+                verbose=1,
             )
 
             history = cvae.fit(
@@ -1067,20 +1076,51 @@ class CreateTransformedVersionsCVAE:
             load_if_exists=True,
         )
 
-        if len(study.trials) == 0:
+        weights_folder = "assets/model_weights"
+        os.makedirs(weights_folder, exist_ok=True)
+
+        weights_file = os.path.join(
+            weights_folder,
+            f"{self.dataset_name}_{self.dataset_group}__vae.weights.h5",
+        )
+
+        best_params_file = os.path.join(
+            weights_folder,
+            f"{self.dataset_name}_{self.dataset_group}_best_params.json",
+        )
+
+        if len(study.trials) == 0 and not os.path.exists(weights_file):
             print("No trials have been completed yet. Running hyperparameter tuning...")
             study.optimize(self.objective, n_trials=n_trials)
+        else:
+            print(
+                "Since the model exists and can be loaded, hypertuning is being skipped...."
+            )
 
         try:
             best_trial = study.best_trial
+            self.best_params = best_trial.params
         except ValueError:
             print(
-                "No best trial found, likely due to no successful trials. Rerunning optimization..."
+                "No best trial found, likely due to no successful trials. Checking if best params file exists..."
             )
-            study.optimize(self.objective, n_trials=n_trials)
-            best_trial = study.best_trial
-
-        self.best_params = best_trial.params
+            if best_params_file:
+                try:
+                    with open(best_params_file, "r") as file:
+                        best_params = json.load(file)
+                        self.best_params = best_params
+                        print("Best params file found. Loading...")
+                except (FileNotFoundError, json.JSONDecodeError):
+                    print(
+                        "Error loading best parameters file. Proceeding with optimization..."
+                    )
+                    study.optimize(self.objective, n_trials=n_trials)
+                    best_trial = study.best_trial
+                    self.best_params = best_trial.params
+            else:
+                study.optimize(self.objective, n_trials=n_trials)
+                best_trial = study.best_trial
+                self.best_params = best_trial.params
 
         self.best_params["bi_rnn"] = False
         self.best_params["shuffle"] = False
