@@ -317,6 +317,7 @@ class CVAE(keras.Model):
 
         return total_loss, reconstruction_loss, prediction_loss, kl_loss
 
+    @tf.function
     def train_step(self, data):
         inputs, batch_target = data
         batch_data, batch_mask, batch_dyn_features = inputs
@@ -354,6 +355,7 @@ class CVAE(keras.Model):
             "kl_loss": self.kl_loss_tracker.result(),
         }
 
+    @tf.function
     def test_step(self, data):
         inputs, targets = data
         batch_data, batch_mask, batch_dyn_features = inputs
