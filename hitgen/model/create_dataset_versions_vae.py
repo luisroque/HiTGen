@@ -607,11 +607,11 @@ class CreateTransformedVersionsCVAE:
 
     @staticmethod
     def make_windowed_dataset(
-            data: np.ndarray,
-            mask: np.ndarray,
-            dyn_features: np.ndarray,
-            window_size: int,
-            stride: int = 1
+        data: np.ndarray,
+        mask: np.ndarray,
+        dyn_features: np.ndarray,
+        window_size: int,
+        stride: int = 1,
     ):
         """
         Create inputs/targets for a one-step-ahead forecast, where:
@@ -650,15 +650,19 @@ class CreateTransformedVersionsCVAE:
         all_y = np.array(all_y, dtype=np.float32)
 
         print("Created windowed dataset shapes:")
-        print("X:", all_X.shape, "M:", all_M.shape, "D:", all_D.shape, "y:", all_y.shape)
+        print(
+            "X:", all_X.shape, "M:", all_M.shape, "D:", all_D.shape, "y:", all_y.shape
+        )
         return all_X, all_M, all_D, all_y
 
-    def create_tf_dataset(self,
-                          data: np.ndarray,
-                          mask: np.ndarray,
-                          dyn_features: np.ndarray,
-                          window_size: int,
-                          batch_size: int):
+    def create_tf_dataset(
+        self,
+        data: np.ndarray,
+        mask: np.ndarray,
+        dyn_features: np.ndarray,
+        window_size: int,
+        batch_size: int,
+    ):
         """
         Wrap the windowed arrays into a tf.data.Dataset of
         ((batch_data, batch_mask, batch_dyn_features), batch_target).
@@ -668,7 +672,7 @@ class CreateTransformedVersionsCVAE:
             mask=mask,
             dyn_features=dyn_features,
             window_size=window_size,
-            stride=1
+            stride=1,
         )
         ds = tf.data.Dataset.from_tensor_slices(((X, M, D), y))
         ds = ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
