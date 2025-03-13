@@ -392,6 +392,11 @@ def tstr(
     for sample_idx in range(samples):
         print(f"\n--- Sample {sample_idx+1} of {samples} ---")
 
+        trtr_cache_file = (
+            f"assets/results/{dataset_name}_{dataset_group}_{method}_{split}"
+            f"TRTR_sample{sample_idx}.json"
+        )
+
         train_idx, test_idx = split_train_test(
             unique_ids,
             sample_idx,
@@ -419,6 +424,30 @@ def tstr(
             start_padding_enabled=True,
             scaler_type="standard",
         )
+
+        if os.path.exists(trtr_cache_file):
+            print(f"    [TRTR] Cache file found for sample={sample_idx}, loading ...")
+            with open(trtr_cache_file, "r") as f:
+                cached_data = json.load(f)
+            smape_trtr = cached_data["smape_trtr"]
+            print(f"    [TRTR] Loaded SMAPE={smape_trtr:.4f} from cache.")
+        else:
+            print("    [TRTR] Training on Real, Testing on Real ...")
+            nf_trtr = NeuralForecast(models=[model_trtr], freq=freq)
+            cv_model_trtr = nf_trtr.cross_validation(
+                df=df_test_real, test_size=horizon, n_windows=None
+            )
+            fcst_trtr = cv_model_trtr.reset_index()
+
+            smape_trtr = smape(fcst_trtr["y"], fcst_trtr["NHITS"])
+            print(f"    [TRTR] Computed SMAPE={smape_trtr:.4f}")
+
+            with open(trtr_cache_file, "w") as f:
+                json.dump(
+                    {"smape_trtr": smape_trtr},
+                    f,
+                )
+            print(f"    [TRTR] Results saved to '{trtr_cache_file}'")
 
         print("    [TRTR] Training on Real, Testing on Real ...")
         nf_trtr = NeuralForecast(models=[model_trtr], freq=freq)
@@ -521,6 +550,11 @@ def compute_downstream_forecast(
     for sample_idx in range(samples):
         print(f"\n--- Sample {sample_idx+1} of {samples} ---")
 
+        original_downstream_forecast_cache_file = (
+            f"assets/results/{dataset_name}_{dataset_group}_{method}_{split}"
+            f"downstream_forecast_original_sample{sample_idx}.json"
+        )
+
         train_idx, test_idx = split_train_test(
             unique_ids,
             sample_idx,
@@ -550,20 +584,36 @@ def compute_downstream_forecast(
 
         input_size = 50
 
-        print("    Training NHITS on original data...")
-        model_original = NHITS(
-            h=horizon,
-            max_steps=500,
-            input_size=input_size,
-            start_padding_enabled=True,
-            scaler_type="standard",
-        )
+        if os.path.exists(original_downstream_forecast_cache_file):
+            print(
+                f"    [ORIGINAL] Cache file found for sample={sample_idx}, loading..."
+            )
+            with open(original_downstream_forecast_cache_file, "r") as f:
+                cached_data = json.load(f)
+            smape_original = cached_data["smape_original"]
+            print(f"    [ORIGINAL] Loaded SMAPE={smape_original:.4f} from cache.")
+        else:
+            print("    Training NHITS on original data...")
+            model_original = NHITS(
+                h=horizon,
+                max_steps=500,
+                input_size=input_size,
+                start_padding_enabled=True,
+                scaler_type="standard",
+            )
+            nf_orig = NeuralForecast(models=[model_original], freq=freq)
+            cv_model_orig = nf_orig.cross_validation(
+                df=df_test_original, test_size=horizon, n_windows=None
+            )
+            fcst_orig = cv_model_orig.reset_index()
+            smape_original = smape(fcst_orig["y"], fcst_orig["NHITS"])
 
-        nf_orig = NeuralForecast(models=[model_original], freq=freq)
-        cv_model_orig = nf_orig.cross_validation(
-            df=df_test_original, test_size=horizon, n_windows=None
-        )
-        fcst_orig = cv_model_orig.reset_index()
+            with open(original_downstream_forecast_cache_file, "w") as f:
+                json.dump({"smape_original": smape_original}, f)
+            print(
+                f"    [ORIGINAL] Computed SMAPE={smape_original:.4f} "
+                f"and saved to {original_downstream_forecast_cache_file}"
+            )
 
         print("    Training NHITS on original + synthetic data...")
         model_concat = NHITS(
@@ -584,7 +634,6 @@ def compute_downstream_forecast(
             ~fcst_concat["unique_id"].str.contains("_synth", na=False)
         ]
 
-        smape_original = smape(fcst_orig["y"], fcst_orig["NHITS"])
         smape_concat = smape(fcst_concat["y"], fcst_concat["NHITS"])
 
         print(f"    SMAPE (original-only): {smape_original:.4f}")

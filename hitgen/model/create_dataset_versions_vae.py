@@ -730,35 +730,37 @@ class CreateTransformedVersionsCVAE:
 
     def update_best_scores(
         self,
-        original_data,
-        synthetic_data,
-        score,
-        latent_dim,
-        window_size,
-        patience,
-        kl_weight,
-        n_blocks_encoder,
-        n_blocks_decoder,
-        n_hidden,
-        n_layers,
-        kernel_size,
-        pooling_mode,
-        batch_size,
-        epochs,
-        learning_rate,
-        bi_rnn,
-        shuffle,
-        forecasting,
-        conv1d_blocks_backcast,
-        filters_backcast,
-        kernel_size_backcast,
-        conv1d_blocks_forecast,
-        filters_forecast,
-        kernel_size_forecast,
-        noise_scale_init,
-        loss,
-    ):
+        original_data: pd.DataFrame,
+        synthetic_data: pd.DataFrame,
+        score: float,
+        latent_dim: int,
+        window_size: int,
+        patience: int,
+        kl_weight: float,
+        n_blocks_encoder: int,
+        n_blocks_decoder: int,
+        n_hidden: int,
+        n_layers: int,
+        kernel_size: int,
+        pooling_mode: str,
+        batch_size: int,
+        epochs: int,
+        learning_rate: float,
+        bi_rnn: bool,
+        shuffle: bool,
+        forecasting: bool,
+        conv1d_blocks_backcast: int,
+        filters_backcast: int,
+        kernel_size_backcast: int,
+        conv1d_blocks_forecast: int,
+        filters_forecast: int,
+        kernel_size_forecast: int,
+        noise_scale_init: float,
+        loss: float,
+        trial: int,
+    ) -> None:
         scores_path = f"assets/model_weights/{self.dataset_name}_{self.dataset_group}_best_hyperparameters.jsonl"
+        opt_path = f"assets/model_weights/{self.dataset_name}_{self.dataset_group}_best_hyperparameters_opt.json"
 
         if os.path.exists(scores_path):
             with open(scores_path, "r") as f:
@@ -767,6 +769,7 @@ class CreateTransformedVersionsCVAE:
             scores_data = []
 
         new_score = {
+            "trial": trial,
             "latent_dim": latent_dim,
             "window_size": window_size,
             "patience": patience,
@@ -825,6 +828,13 @@ class CreateTransformedVersionsCVAE:
             for score_entry in scores_data:
                 f.write(json.dumps(score_entry) + "\n")
 
+        best_score = scores_data[:1]
+        opt_meta_info = {"current_trial": trial, "best_score": best_score}
+
+        os.makedirs(os.path.dirname(opt_path), exist_ok=True)
+        with open(opt_path, "w") as f:
+            f.write(json.dumps(opt_meta_info) + "\n")
+
         print(f"Best scores updated and saved to {scores_path}")
 
     @staticmethod
@@ -870,41 +880,41 @@ class CreateTransformedVersionsCVAE:
         Objective function for Optuna to tune the CVAE hyperparameters.
         """
         try:
-            latent_dim = trial.suggest_int("latent_dim", 8, 300, step=8)
+            latent_dim = trial.suggest_int("latent_dim", 8, 128, step=8)
             if self.freq == "M" or self.freq == "MS":
-                window_size = trial.suggest_int("window_size", 3, 24, step=3)
+                window_size = trial.suggest_int("window_size", 3, 12, step=3)
             elif self.freq == "Q" or self.freq == "QS":
-                window_size = trial.suggest_int("window_size", 4, 12, step=2)
+                window_size = trial.suggest_int("window_size", 4, 8, step=2)
             elif self.freq == "Y" or self.freq == "YS":
-                window_size = trial.suggest_int("window_size", 2, 6, step=1)
+                window_size = trial.suggest_int("window_size", 2, 4, step=1)
             else:
                 window_size = trial.suggest_int("window_size", 4, 24, step=1)
-            patience = trial.suggest_int("patience", 20, 40, step=5)
+            patience = trial.suggest_int("patience", 10, 15, step=1)
             kl_weight = trial.suggest_float("kl_weight", 0.05, 0.5)
-            n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 5)
-            n_blocks_decoder = trial.suggest_int("n_blocks_decoder", 1, 5)
-            n_hidden = trial.suggest_int("n_hidden", 16, 128, step=16)
-            n_layers = trial.suggest_int("n_layers", 1, 5)
+            n_blocks_encoder = trial.suggest_int("n_blocks_encoder", 1, 3)
+            n_blocks_decoder = trial.suggest_int("n_blocks_decoder", 1, 3)
+            n_hidden = trial.suggest_int("n_hidden", 16, 64, step=8)
+            n_layers = trial.suggest_int("n_layers", 1, 3)
             kernel_size = trial.suggest_int("kernel_size", 2, 5)
             pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
-            batch_size = trial.suggest_categorical("batch_size", [4, 8, 16, 32])
-            epochs = trial.suggest_int("epochs", 200, 2000, step=100)
-            learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
+            batch_size = trial.suggest_int("batch_size", 8, 32, step=8)
+            epochs = trial.suggest_int("epochs", 100, 500, step=25)
+            learning_rate = trial.suggest_loguniform("learning_rate", 3e-5, 3e-4)
             # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
             # forecasting = trial.suggest_categorical("forecasting", [True, False])
             # shuffle = trial.suggest_categorical("shuffle", [True, False])
             noise_scale_init = trial.suggest_float("noise_scale_init", 0.01, 0.5)
             conv1d_blocks_backcast = trial.suggest_int(
-                "conv1d_blocks_backcast", 1, 5, step=1
+                "conv1d_blocks_backcast", 1, 3, step=1
             )
-            filters_backcast = trial.suggest_int("filters_backcast", 16, 256, step=16)
+            filters_backcast = trial.suggest_int("filters_backcast", 16, 128, step=8)
             kernel_size_backcast = trial.suggest_int(
                 "kernel_size_backcast", 2, 4, step=1
             )
             conv1d_blocks_forecast = trial.suggest_int(
-                "conv1d_blocks_forecast", 1, 5, step=1
+                "conv1d_blocks_forecast", 1, 3, step=1
             )
-            filters_forecast = trial.suggest_int("filters_forecast", 16, 256, step=16)
+            filters_forecast = trial.suggest_int("filters_forecast", 16, 128, step=8)
             kernel_size_forecast = trial.suggest_int(
                 "kernel_size_forecast", 2, 4, step=1
             )
@@ -1045,6 +1055,7 @@ class CreateTransformedVersionsCVAE:
                 kernel_size_forecast=kernel_size_forecast,
                 noise_scale_init=noise_scale_init,
                 loss=loss,
+                trial=trial.number,
             )
 
             # clean GPU memory between trials
