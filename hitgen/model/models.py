@@ -338,7 +338,7 @@ class MRHIBlock(tf.keras.layers.Layer):
         **kwargs,
     ):
         """
-        Multi-Rate Hierarchical Interpolation Block for time-series decomposition.
+        Multi-Rate Hierarchical Interpolation Block.
         """
         super(MRHIBlock, self).__init__(**kwargs)
         self.backcast_size = backcast_size
