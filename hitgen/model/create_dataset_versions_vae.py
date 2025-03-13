@@ -49,17 +49,9 @@ class CreateTransformedVersionsCVAE:
         dataset_group: str,
         freq: str,
         batch_size: int = 8,
-        shuffle: bool = False,
         noise_scale: float = 0.1,
         amplitude: float = 1.0,
-        bi_rnn: bool = False,
         forecasting: bool = True,
-        conv1d_blocks_backcast=2,
-        filters_backcast=64,
-        kernel_size_backcast=3,
-        conv1d_blocks_forecast=2,
-        filters_forecast=64,
-        kernel_size_forecast=3,
         kl_weight_init: float = 0.1,
         noise_scale_init: float = 0.1,
         n_blocks_encoder: int = 3,
@@ -67,7 +59,6 @@ class CreateTransformedVersionsCVAE:
         n_hidden: int = 16,
         n_layers: int = 3,
         kernel_size: int = 2,
-        pooling_mode: str = "average",
         patience: int = 30,
         horizon: int = 24,
         opt_score: str = "discriminative_score",
@@ -78,8 +69,6 @@ class CreateTransformedVersionsCVAE:
         self.noise_scale = noise_scale
         self.amplitude = amplitude
         self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.bi_rnn = bi_rnn
         self.forecasting = forecasting
         self.kl_weight_init = kl_weight_init
         self.noise_scale_init = noise_scale_init
@@ -89,13 +78,6 @@ class CreateTransformedVersionsCVAE:
         self.n_layers = n_layers
         self.patience = patience
         self.kernel_size = kernel_size
-        self.pooling_mode = pooling_mode
-        self.conv1d_blocks_backcast = conv1d_blocks_backcast
-        self.filters_backcast = filters_backcast
-        self.kernel_size_backcast = kernel_size_backcast
-        self.conv1d_blocks_forecast = conv1d_blocks_forecast
-        self.filters_forecast = filters_forecast
-        self.kernel_size_forecast = kernel_size_forecast
         (self.data, self.s, self.freq) = self.load_data(
             self.dataset_name, self.dataset_group
         )
@@ -627,21 +609,13 @@ class CreateTransformedVersionsCVAE:
             window_size=window_size,
             n_series=self.s,
             latent_dim=latent_dim,
-            bi_rnn=self.bi_rnn,
             noise_scale_init=self.noise_scale_init,
             n_blocks_encoder=self.n_blocks_encoder,
             n_blocks_decoder=self.n_blocks_decoder,
             n_hidden=self.n_hidden,
             n_layers=self.n_layers,
             kernel_size=self.kernel_size,
-            pooling_mode=self.pooling_mode,
             forecasting=self.forecasting,
-            conv1d_blocks_backcast=self.conv1d_blocks_backcast,
-            filters_backcast=self.filters_backcast,
-            kernel_size_backcast=self.kernel_size_backcast,
-            conv1d_blocks_forecast=self.conv1d_blocks_forecast,
-            filters_forecast=self.filters_forecast,
-            kernel_size_forecast=self.kernel_size_forecast,
         )
 
         cvae = CVAE(
@@ -742,19 +716,10 @@ class CreateTransformedVersionsCVAE:
         n_hidden: int,
         n_layers: int,
         kernel_size: int,
-        pooling_mode: str,
         batch_size: int,
         epochs: int,
         learning_rate: float,
-        bi_rnn: bool,
-        shuffle: bool,
         forecasting: bool,
-        conv1d_blocks_backcast: int,
-        filters_backcast: int,
-        kernel_size_backcast: int,
-        conv1d_blocks_forecast: int,
-        filters_forecast: int,
-        kernel_size_forecast: int,
         noise_scale_init: float,
         loss: float,
         trial: int,
@@ -779,19 +744,10 @@ class CreateTransformedVersionsCVAE:
             "n_hidden": n_hidden,
             "n_layers": n_layers,
             "kernel_size": kernel_size,
-            "pooling_mode": pooling_mode,
             "batch_size": batch_size,
             "epochs": epochs,
             "learning_rate": learning_rate,
-            "bi_rnn": bi_rnn,
-            "shuffle": shuffle,
             "forecasting": forecasting,
-            "conv1d_blocks_backcast": conv1d_blocks_backcast,
-            "filters_backcast": filters_backcast,
-            "kernel_size_backcast": kernel_size_backcast,
-            "conv1d_blocks_forecast": conv1d_blocks_forecast,
-            "filters_forecast": filters_forecast,
-            "kernel_size_forecast": kernel_size_forecast,
             "noise_scale_init": noise_scale_init,
             "loss": loss,
             self.opt_score: score,
@@ -895,32 +851,12 @@ class CreateTransformedVersionsCVAE:
             n_blocks_decoder = trial.suggest_int("n_blocks_decoder", 1, 3)
             n_hidden = trial.suggest_int("n_hidden", 16, 64, step=8)
             n_layers = trial.suggest_int("n_layers", 1, 3)
-            kernel_size = trial.suggest_int("kernel_size", 2, 5)
-            pooling_mode = trial.suggest_categorical("pooling_mode", ["max", "average"])
+            kernel_size = trial.suggest_int("kernel_size", 1, 3)
             batch_size = trial.suggest_int("batch_size", 8, 32, step=8)
             epochs = trial.suggest_int("epochs", 100, 500, step=25)
             learning_rate = trial.suggest_loguniform("learning_rate", 3e-5, 3e-4)
-            # bi_rnn = trial.suggest_categorical("bi_rnn", [True, False])
-            # forecasting = trial.suggest_categorical("forecasting", [True, False])
-            # shuffle = trial.suggest_categorical("shuffle", [True, False])
             noise_scale_init = trial.suggest_float("noise_scale_init", 0.01, 0.5)
-            conv1d_blocks_backcast = trial.suggest_int(
-                "conv1d_blocks_backcast", 1, 3, step=1
-            )
-            filters_backcast = trial.suggest_int("filters_backcast", 16, 128, step=8)
-            kernel_size_backcast = trial.suggest_int(
-                "kernel_size_backcast", 2, 4, step=1
-            )
-            conv1d_blocks_forecast = trial.suggest_int(
-                "conv1d_blocks_forecast", 1, 3, step=1
-            )
-            filters_forecast = trial.suggest_int("filters_forecast", 16, 128, step=8)
-            kernel_size_forecast = trial.suggest_int(
-                "kernel_size_forecast", 2, 4, step=1
-            )
 
-            bi_rnn = False
-            shuffle = False
             forecasting = True
 
             data_mask_temporalized = TemporalizeGenerator(
@@ -929,28 +865,19 @@ class CreateTransformedVersionsCVAE:
                 self.train_dyn_features,
                 window_size=window_size,
                 batch_size=batch_size,
-                shuffle=shuffle,
             )
 
             encoder, decoder = get_CVAE(
                 window_size=window_size,
                 n_series=self.s_train,
                 latent_dim=latent_dim,
-                bi_rnn=bi_rnn,
                 noise_scale_init=noise_scale_init,
                 n_blocks_encoder=n_blocks_encoder,
                 n_blocks_decoder=n_blocks_decoder,
                 n_hidden=n_hidden,
                 n_layers=n_layers,
                 kernel_size=kernel_size,
-                pooling_mode=pooling_mode,
                 forecasting=forecasting,
-                conv1d_blocks_backcast=conv1d_blocks_backcast,
-                filters_backcast=filters_backcast,
-                kernel_size_backcast=kernel_size_backcast,
-                conv1d_blocks_forecast=conv1d_blocks_forecast,
-                filters_forecast=filters_forecast,
-                kernel_size_forecast=kernel_size_forecast,
             )
 
             cvae = CVAE(
@@ -991,6 +918,8 @@ class CreateTransformedVersionsCVAE:
 
             synthetic_long = self.predict_train(
                 cvae,
+                latent_dim=latent_dim,
+                window_size=window_size,
                 data_mask_temporalized=data_mask_temporalized,
             )
 
@@ -1040,19 +969,10 @@ class CreateTransformedVersionsCVAE:
                 n_hidden=n_hidden,
                 n_layers=n_layers,
                 kernel_size=kernel_size,
-                pooling_mode=pooling_mode,
                 batch_size=batch_size,
                 epochs=epochs,
                 learning_rate=learning_rate,
-                bi_rnn=bi_rnn,
-                shuffle=shuffle,
                 forecasting=forecasting,
-                conv1d_blocks_backcast=conv1d_blocks_backcast,
-                filters_backcast=filters_backcast,
-                kernel_size_backcast=kernel_size_backcast,
-                conv1d_blocks_forecast=conv1d_blocks_forecast,
-                filters_forecast=filters_forecast,
-                kernel_size_forecast=kernel_size_forecast,
                 noise_scale_init=noise_scale_init,
                 loss=loss,
                 trial=trial.number,
@@ -1151,21 +1071,13 @@ class CreateTransformedVersionsCVAE:
             window_size=self.best_params["window_size"],
             n_series=self.s,
             latent_dim=self.best_params["latent_dim"],
-            bi_rnn=self.best_params["bi_rnn"],
             noise_scale_init=self.best_params["noise_scale_init"],
             n_blocks_encoder=self.best_params["n_blocks_encoder"],
             n_blocks_decoder=self.best_params["n_blocks_decoder"],
             n_hidden=self.best_params["n_hidden"],
             n_layers=self.best_params["n_layers"],
             kernel_size=self.best_params["kernel_size"],
-            pooling_mode=self.best_params["pooling_mode"],
             forecasting=self.best_params["forecasting"],
-            conv1d_blocks_backcast=self.best_params["conv1d_blocks_backcast"],
-            filters_backcast=self.best_params["filters_backcast"],
-            kernel_size_backcast=self.best_params["kernel_size_backcast"],
-            conv1d_blocks_forecast=self.best_params["conv1d_blocks_forecast"],
-            filters_forecast=self.best_params["filters_forecast"],
-            kernel_size_forecast=self.best_params["kernel_size_forecast"],
         )
 
         cvae = CVAE(
@@ -1259,6 +1171,8 @@ class CreateTransformedVersionsCVAE:
     def predict(
         self,
         cvae: CVAE,
+        latent_dim: int,
+        window_size: int,
         data_mask_temporalized,
     ) -> Tuple[
         pd.DataFrame,
@@ -1274,9 +1188,10 @@ class CreateTransformedVersionsCVAE:
                 data_mask_temporalized.temporalized_dyn_features,
             ]
         )
-        alpha = 3  # x times bigger variance
+        alpha = 5  # x times bigger variance
         epsilon = np.random.normal(size=z_mean.shape) * 0.1
         z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
+        # z_augmented = np.random.normal(size=(len(data_mask_temporalized.temporalized_mask), window_size, latent_dim))
         generated_data, predictions = cvae.decoder.predict(
             [
                 z_augmented,
@@ -1302,6 +1217,8 @@ class CreateTransformedVersionsCVAE:
     def predict_train(
         self,
         cvae: CVAE,
+        window_size: int,
+        latent_dim: int,
         data_mask_temporalized,
     ) -> pd.DataFrame:
         """Predict original time series using VAE"""
@@ -1313,9 +1230,10 @@ class CreateTransformedVersionsCVAE:
                 data_mask_temporalized.temporalized_dyn_features,
             ]
         )
-        alpha = 3  # x times bigger variance
+        alpha = 5  # x times bigger variance
         epsilon = np.random.normal(size=z_mean.shape) * 0.1
         z_augmented = z_mean + np.exp(0.5 * z_log_var) * alpha * epsilon
+        # z_augmented = np.random.normal(size=(len(data_mask_temporalized.temporalized_mask), window_size, latent_dim))
         generated_data, predictions = cvae.decoder.predict(
             [
                 z_augmented,

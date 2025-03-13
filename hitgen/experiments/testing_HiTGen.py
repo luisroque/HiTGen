@@ -164,18 +164,18 @@ DATASETS_HYPERPARAMS_CONFIGS = {
 }
 
 DATASET_GROUP_FREQ = {
-    # "Tourism": {
-    #     "Monthly": {"FREQ": "M", "H": 24},
-    # },
+    "Tourism": {
+        "Monthly": {"FREQ": "M", "H": 24},
+    },
     # "M1": {
     #     "Monthly": {"FREQ": "M", "H": 24},
     #     "Quarterly": {"FREQ": "Q", "H": 8},
     # },
-    "M3": {
-        "Monthly": {"FREQ": "M", "H": 24},
+    # "M3": {
+    #     "Monthly": {"FREQ": "M", "H": 24},
         # "Quarterly": {"FREQ": "Q", "H": 8},
         # "Yearly": {"FREQ": "Y", "H": 4},
-    },
+    # },
 }
 
 
@@ -310,6 +310,8 @@ if __name__ == "__main__":
                 synth_hitgen_test_long,
             ) = create_dataset_vae.predict(
                 model,
+                latent_dim=create_dataset_vae.best_params["latent_dim"],
+                window_size=create_dataset_vae.best_params["window_size"],
                 data_mask_temporalized=data_mask_temporalized,
             )
 
