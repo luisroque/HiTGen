@@ -75,7 +75,6 @@ class TemporalizeGenerator(utils.Sequence):
 
         return (batch_data, batch_mask, batch_dyn_features), batch_target
 
-
     def temporalize(self, data):
         """
         Create temporal windows from the input data.
@@ -244,16 +243,14 @@ class CVAE(keras.Model):
         )
         pred_reconst, pred = self.decoder([z, batch_mask, batch_dyn_features])
 
-        total_loss, reconstruction_loss, prediction_loss, kl_loss = (
-            self.compute_loss(
-                batch_data,
-                pred_reconst,
-                pred,
-                z_mean,
-                z_log_var,
-                batch_mask,
-                batch_target,
-            )
+        total_loss, reconstruction_loss, prediction_loss, kl_loss = self.compute_loss(
+            batch_data,
+            pred_reconst,
+            pred,
+            z_mean,
+            z_log_var,
+            batch_mask,
+            batch_target,
         )
 
         return {
@@ -364,7 +361,7 @@ class MRHIBlock(tf.keras.layers.Layer):
 
 
 class UpsampleTimeLayer(tf.keras.layers.Layer):
-    def __init__(self, target_len: int, method='bilinear'):
+    def __init__(self, target_len: int, method="bilinear"):
         super().__init__()
         self.target_len = target_len
         self.method = method
@@ -373,11 +370,11 @@ class UpsampleTimeLayer(tf.keras.layers.Layer):
         # x shape: [B, current_len, num_features]
         x = tf.expand_dims(x, axis=1)  # => [B, 1, current_len, num_features]
         x_upsampled = tf.image.resize(
-            images=x,
-            size=(1, self.target_len),
-            method=self.method
+            images=x, size=(1, self.target_len), method=self.method
         )  # => [B, 1, target_len, num_features]
-        x_upsampled = tf.squeeze(x_upsampled, axis=1)  # => [B, target_len, num_features]
+        x_upsampled = tf.squeeze(
+            x_upsampled, axis=1
+        )  # => [B, target_len, num_features]
         return x_upsampled
 
 
@@ -392,14 +389,14 @@ class MRHIBlock_backcast_forecast(tf.keras.layers.Layer):
     """
 
     def __init__(
-            self,
-            backcast_size,
-            n_knots: int,
-            n_hidden: int,
-            n_layers: int,
-            kernel_size=3,
-            activation="relu",
-            **kwargs,
+        self,
+        backcast_size,
+        n_knots: int,
+        n_hidden: int,
+        n_layers: int,
+        kernel_size=3,
+        activation="relu",
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.seq_len, self.num_features = backcast_size
@@ -414,19 +411,18 @@ class MRHIBlock_backcast_forecast(tf.keras.layers.Layer):
         self.n_theta = self.n_theta_backcast + self.n_theta_forecast
 
         self.upsample_layer = UpsampleTimeLayer(
-            target_len=self.seq_len,
-            method='bilinear'
+            target_len=self.seq_len, method="bilinear"
         )
 
         self.pooling_layer = layers.MaxPooling1D(
-            pool_size=kernel_size,
-            strides=kernel_size,
-            padding="valid"
+            pool_size=kernel_size, strides=kernel_size, padding="valid"
         )
 
         # flatten => MLP => final Dense(n_theta)
         mlp_layers = []
-        mlp_layers.append(layers.Flatten())  # [B, T//k, num_features] => [B, (T//k)*num_features]
+        mlp_layers.append(
+            layers.Flatten()
+        )  # [B, T//k, num_features] => [B, (T//k)*num_features]
         for _ in range(n_layers):
             mlp_layers.append(layers.Dense(n_hidden, activation=activation))
         mlp_layers.append(layers.Dense(self.n_theta))  # outputs [B, n_theta]
@@ -441,8 +437,8 @@ class MRHIBlock_backcast_forecast(tf.keras.layers.Layer):
 
         theta = self.mlp_stack(pooled)  # => [B, n_theta]
 
-        backcast_flat = theta[:, : self.n_theta_backcast]         # [B, seq_len * num_features]
-        knots_flat = theta[:, self.n_theta_backcast:]             # [B, n_knots * num_features]
+        backcast_flat = theta[:, : self.n_theta_backcast]  # [B, seq_len * num_features]
+        knots_flat = theta[:, self.n_theta_backcast :]  # [B, n_knots * num_features]
 
         backcast = tf.reshape(backcast_flat, [-1, self.seq_len, self.num_features])
 
@@ -506,7 +502,9 @@ def encoder(
         final_output
     )
 
-    z = Sampling(name="sampling", noise_scale_init=noise_scale_init)([z_mean, z_log_var])
+    z = Sampling(name="sampling", noise_scale_init=noise_scale_init)(
+        [z_mean, z_log_var]
+    )
 
     return tf.keras.Model(
         inputs=[main_input, mask_input, dyn_features_input],
